@@ -90,6 +90,25 @@ export interface QueuePoolStats {
   queuedCount: number;
 }
 
+export type PartyStatus = 'FORMING' | 'QUEUED' | 'MATCHED' | 'CANCELLED';
+
+export interface PartyMemberView {
+  userId: string;
+  displayName: string;
+  isLeader: boolean;
+}
+
+// Returned by the /api/party endpoints (null when the caller has no party).
+export interface Party {
+  id: string;
+  leaderId: string;
+  status: PartyStatus;
+  createdAt: string;
+  inviteCode: string;
+  isLeader: boolean;
+  members: PartyMemberView[];
+}
+
 // Standard API envelopes (Foundation Bible, Section 4.5).
 export interface ApiSuccess<T> {
   data: T;

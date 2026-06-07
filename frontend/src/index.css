@@ -141,4 +141,39 @@ button:disabled {
   border: 1px solid #e2e5ec;
   border-radius: 8px;
   max-width: 480px;
+  margin-top: 1rem;
+}
+
+.queue-state h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.party-join {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.party-join input {
+  padding: 0.5rem;
+  border: 1px solid #cbd2dc;
+  border-radius: 6px;
+  font: inherit;
+}
+
+.party-members {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.party-invite {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.badge {
+  color: #2563eb;
+  font-size: 0.85rem;
 }
