@@ -1,0 +1,469 @@
+// VentureLake — FULL data model (Foundation Bible, Section 5).
+// Defined once, up front. Later phases build against this schema and must NOT add models.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum PrimaryRole {
+  BUILDER
+  DESIGNER
+  GROWTH_SALES
+  BUSINESS_OPERATIONS
+}
+
+enum QueueStatus {
+  QUEUED
+  MATCHED
+  COOLDOWN
+  CANCELLED
+}
+
+enum PartyStatus {
+  FORMING
+  QUEUED
+  MATCHED
+  CANCELLED
+}
+
+enum TeamStatus {
+  LOBBY
+  IDEA_VOTING
+  CAPTAIN_VOTING
+  MISSION_ACTIVE
+  SUBMITTED
+  UNDER_REVIEW
+  APPEAL_WINDOW
+  REVIEW_FINAL
+  CONTINUATION_VOTING
+  CONTINUING
+  PIVOTING
+  PUBLISHED
+  DISBANDED
+  FAILED
+}
+
+enum MissionIdeaStatus {
+  PROPOSED
+  ACCEPTED
+  REJECTED
+}
+
+enum IdeaVoteValue {
+  YES
+  NO
+}
+
+enum MissionStatus {
+  ACTIVE
+  SUBMITTED
+  FAILED
+  REVIEWED
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  FINAL
+}
+
+enum VCAssignmentStatus {
+  ASSIGNED
+  ACCEPTED
+  COMPLETED
+  EXPIRED
+  PASSED
+}
+
+enum VCReviewStatus {
+  VALID
+  INVALID
+}
+
+enum ReviewAppealStatus {
+  OPEN
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum AppealVoteValue {
+  YES
+  NO
+}
+
+enum ContinuationChoice {
+  CONTINUE
+  PIVOT
+  PUBLISH_END
+  DISBAND_PRIVATE
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  founderProfile         FounderProfile?
+  vcProfile              VCProfile?
+  queueEntries           QueueEntry[]
+  ledParties             Party[]                 @relation("PartyLeader")
+  partyMemberships       PartyMember[]
+  captainedTeams         Team[]                  @relation("TeamCaptain")
+  teamMemberships        TeamMember[]
+  teamMessages           TeamMessage[]
+  ideaVotes              IdeaVote[]
+  captainNominations     CaptainNomination[]
+  captainVotesCast       CaptainVote[]           @relation("CaptainVoter")
+  captainVotesReceived   CaptainVote[]           @relation("CaptainCandidate")
+  deliverableAssignments DeliverableAssignment[]
+  missionSubmissions     MissionSubmission[]
+  vcReviewAssignments    VCReviewAssignment[]
+  vcReviews              VCReview[]
+  appealVotes            AppealVote[]
+  continuationVotes      ContinuationVote[]
+  showcaseAttributions   ShowcaseAttribution[]
+}
+
+model FounderProfile {
+  id                       String      @id @default(cuid())
+  userId                   String      @unique
+  user                     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                     String
+  city                     String
+  timezone                 String
+  languages                String[]
+  primaryRole              PrimaryRole
+  skills                   String[]
+  industryInterests        String[]
+  availabilityHoursPerWeek Int
+  bio                      String
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
+}
+
+model QueueEntry {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partyId       String?
+  party         Party?      @relation(fields: [partyId], references: [id])
+  status        QueueStatus @default(QUEUED)
+  queuedAt      DateTime    @default(now())
+  matchedAt     DateTime?
+  cooldownUntil DateTime?
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Party {
+  id        String      @id @default(cuid())
+  leaderId  String
+  leader    User        @relation("PartyLeader", fields: [leaderId], references: [id])
+  status    PartyStatus @default(FORMING)
+  createdAt DateTime    @default(now())
+
+  members      PartyMember[]
+  queueEntries QueueEntry[]
+}
+
+model PartyMember {
+  id       String   @id @default(cuid())
+  partyId  String
+  party    Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt DateTime @default(now())
+
+  @@unique([partyId, userId])
+}
+
+model Team {
+  id                String     @id @default(cuid())
+  status            TeamStatus @default(LOBBY)
+  captainId         String?
+  captain           User?      @relation("TeamCaptain", fields: [captainId], references: [id])
+  // Human-readable skill-coverage match explanation (written by the matchmaking engine, Phase 3.1).
+  matchExplanation  String?
+  missionStartedAt  DateTime?
+  missionDeadlineAt DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  members            TeamMember[]
+  messages           TeamMessage[]
+  missionIdeas       MissionIdea[]
+  captainNominations CaptainNomination[]
+  captainVotes       CaptainVote[]
+  missions           Mission[]
+  submissions        MissionSubmission[]
+  reviewAppeals      ReviewAppeal[]
+  continuationVotes  ContinuationVote[]
+  showcaseProjects   ShowcaseProject[]
+}
+
+model TeamMember {
+  id       String    @id @default(cuid())
+  teamId   String
+  team     Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+
+  @@unique([teamId, userId])
+}
+
+model TeamMessage {
+  id        String   @id @default(cuid())
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([teamId])
+}
+
+model MissionIdea {
+  id               String            @id @default(cuid())
+  teamId           String
+  team             Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  title            String
+  description      String
+  category         String
+  reasoning        String
+  status           MissionIdeaStatus @default(PROPOSED)
+  generationNumber Int               @default(1)
+  createdAt        DateTime          @default(now())
+
+  votes    IdeaVote[]
+  missions Mission[]
+}
+
+model IdeaVote {
+  id            String        @id @default(cuid())
+  missionIdeaId String
+  missionIdea   MissionIdea   @relation(fields: [missionIdeaId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  vote          IdeaVoteValue
+  rejectReason  String?
+  feedbackNote  String?
+  createdAt     DateTime      @default(now())
+
+  @@unique([missionIdeaId, userId])
+}
+
+model CaptainNomination {
+  id        String   @id @default(cuid())
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([teamId, userId])
+}
+
+model CaptainVote {
+  id          String   @id @default(cuid())
+  teamId      String
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  voterId     String
+  voter       User     @relation("CaptainVoter", fields: [voterId], references: [id])
+  candidateId String
+  candidate   User     @relation("CaptainCandidate", fields: [candidateId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([teamId, voterId])
+}
+
+model Mission {
+  id            String        @id @default(cuid())
+  teamId        String
+  team          Team          @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  missionIdeaId String
+  missionIdea   MissionIdea   @relation(fields: [missionIdeaId], references: [id])
+  title         String
+  brief         String
+  durationHours Int           @default(72)
+  deliverables  Json
+  status        MissionStatus @default(ACTIVE)
+  startedAt     DateTime      @default(now())
+  deadlineAt    DateTime
+  submittedAt   DateTime?
+
+  deliverableAssignments DeliverableAssignment[]
+  submissions            MissionSubmission[]
+}
+
+model DeliverableAssignment {
+  id           String  @id @default(cuid())
+  missionId    String
+  mission      Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  title        String
+  description  String
+  assignedToId String
+  assignedTo   User    @relation(fields: [assignedToId], references: [id])
+}
+
+model MissionSubmission {
+  id            String           @id @default(cuid())
+  missionId     String
+  mission       Mission          @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  teamId        String
+  team          Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  submittedById String
+  submittedBy   User             @relation(fields: [submittedById], references: [id])
+  summary       String
+  pitchText     String?
+  prototypeUrl  String?
+  landingPageUrl String?
+  demoUrl       String?
+  files         Json?
+  submittedAt   DateTime         @default(now())
+  status        SubmissionStatus @default(SUBMITTED)
+
+  reviewAssignments VCReviewAssignment[]
+  reviews           VCReview[]
+  appeals           ReviewAppeal[]
+  showcaseProjects  ShowcaseProject[]
+}
+
+model VCProfile {
+  id                  String    @id @default(cuid())
+  userId              String    @unique
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  approved            Boolean   @default(false)
+  approvedAt          DateTime?
+  reviewCooldownUntil DateTime?
+  createdAt           DateTime  @default(now())
+}
+
+model VCReviewAssignment {
+  id             String             @id @default(cuid())
+  submissionId   String
+  submission     MissionSubmission  @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  vcUserId       String
+  vcUser         User               @relation(fields: [vcUserId], references: [id])
+  status         VCAssignmentStatus @default(ASSIGNED)
+  assignedAt     DateTime           @default(now())
+  acceptedAt     DateTime?
+  deadlineAt     DateTime?
+  completedAt    DateTime?
+  isAppealReview Boolean            @default(false)
+
+  reviews VCReview[]
+
+  @@index([vcUserId])
+  @@index([submissionId])
+}
+
+model VCReview {
+  id             String             @id @default(cuid())
+  submissionId   String
+  submission     MissionSubmission  @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  vcUserId       String
+  vcUser         User               @relation(fields: [vcUserId], references: [id])
+  assignmentId   String
+  assignment     VCReviewAssignment @relation(fields: [assignmentId], references: [id])
+  isAppealReview Boolean            @default(false)
+  overallScore   Float
+  status         VCReviewStatus     @default(VALID)
+  createdAt      DateTime           @default(now())
+
+  categories VCReviewCategory[]
+}
+
+model VCReviewCategory {
+  id       String   @id @default(cuid())
+  reviewId String
+  review   VCReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  category String
+  score    Int
+  feedback String
+}
+
+model ReviewAppeal {
+  id           String             @id @default(cuid())
+  submissionId String
+  submission   MissionSubmission  @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  teamId       String
+  team         Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  status       ReviewAppealStatus @default(OPEN)
+  createdAt    DateTime           @default(now())
+  expiresAt    DateTime
+
+  votes AppealVote[]
+}
+
+model AppealVote {
+  id        String          @id @default(cuid())
+  appealId  String
+  appeal    ReviewAppeal    @relation(fields: [appealId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User            @relation(fields: [userId], references: [id])
+  vote      AppealVoteValue
+  createdAt DateTime        @default(now())
+
+  @@unique([appealId, userId])
+}
+
+model ContinuationVote {
+  id        String             @id @default(cuid())
+  teamId    String
+  team      Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User               @relation(fields: [userId], references: [id])
+  choice    ContinuationChoice
+  createdAt DateTime           @default(now())
+
+  @@unique([teamId, userId])
+}
+
+model ShowcaseProject {
+  id                  String            @id @default(cuid())
+  teamId              String
+  team                Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  missionSubmissionId String
+  missionSubmission   MissionSubmission @relation(fields: [missionSubmissionId], references: [id])
+  title               String
+  tagline             String
+  shortPitch          String
+  prototypeUrl        String
+  finalScore          Float
+  isPublic            Boolean           @default(false)
+  publishedAt         DateTime?
+
+  attributions ShowcaseAttribution[]
+}
+
+model ShowcaseAttribution {
+  id                String          @id @default(cuid())
+  showcaseProjectId String
+  showcaseProject   ShowcaseProject @relation(fields: [showcaseProjectId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User            @relation(fields: [userId], references: [id])
+  visible           Boolean         @default(true)
+
+  @@unique([showcaseProjectId, userId])
+}
