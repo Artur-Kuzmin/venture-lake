@@ -48,6 +48,25 @@ export interface FounderProfile {
   updatedAt: string;
 }
 
+// Payload sent to POST/PUT /api/profile.
+export interface ProfileInput {
+  name: string;
+  city: string;
+  timezone: string;
+  languages: string[];
+  primaryRole: PrimaryRole;
+  skills: string[];
+  industryInterests: string[];
+  availabilityHoursPerWeek: number;
+  bio: string;
+}
+
+// Returned by POST /api/auth/signup and POST /api/auth/login.
+export interface AuthResponse {
+  token: string;
+  user: User;
+}
+
 // Standard API envelopes (Foundation Bible, Section 4.5).
 export interface ApiSuccess<T> {
   data: T;

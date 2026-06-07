@@ -43,3 +43,91 @@ a {
 .placeholder {
   color: #6b7280;
 }
+
+/* Forms (auth + profile) */
+.auth-form,
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  max-width: 480px;
+}
+
+.auth-form label,
+.profile-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-weight: 500;
+}
+
+.auth-form input,
+.profile-form input,
+.profile-form select,
+.profile-form textarea {
+  padding: 0.5rem;
+  border: 1px solid #cbd2dc;
+  border-radius: 6px;
+  font: inherit;
+}
+
+.profile-form fieldset {
+  border: 1px solid #e2e5ec;
+  border-radius: 6px;
+  padding: 0.75rem;
+}
+
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.4rem;
+}
+
+.checkbox-row {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 400 !important;
+}
+
+button {
+  padding: 0.55rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.link-button {
+  background: none;
+  color: #2563eb;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.form-error {
+  color: #b91c1c;
+  margin: 0;
+}
+
+.profile-view {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.4rem 1rem;
+}
+
+.profile-view dt {
+  font-weight: 600;
+  color: #374151;
+}
+
+.profile-view dd {
+  margin: 0;
+}

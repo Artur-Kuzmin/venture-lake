@@ -17,3 +17,6 @@ yarn-error.log*
 # prisma local artifacts
 backend/prisma/*.db
 backend/prisma/*.db-journal
+
+# TypeScript incremental build info
+*.tsbuildinfo
