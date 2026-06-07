@@ -68,7 +68,14 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="/lobby" element={<LobbyPage />} />
+        <Route
+          path="/lobby"
+          element={
+            <ProtectedRoute requireProfile>
+              <LobbyPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/team/:teamId" element={<TeamPage />} />
         <Route path="/vc" element={<VCPage />} />
         <Route path="/showcase" element={<ShowcasePage />} />

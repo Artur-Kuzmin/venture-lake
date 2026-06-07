@@ -67,6 +67,29 @@ export interface AuthResponse {
   user: User;
 }
 
+export type QueueStatus = 'QUEUED' | 'MATCHED' | 'COOLDOWN' | 'CANCELLED';
+
+export interface QueueEntry {
+  id: string;
+  userId: string;
+  partyId: string | null;
+  status: QueueStatus;
+  queuedAt: string;
+  matchedAt: string | null;
+  cooldownUntil: string | null;
+}
+
+// Returned by GET /api/queue/me.
+export interface QueueMe {
+  entry: QueueEntry | null;
+  cooldownUntil: string | null;
+}
+
+// Returned by GET /api/queue/status.
+export interface QueuePoolStats {
+  queuedCount: number;
+}
+
 // Standard API envelopes (Foundation Bible, Section 4.5).
 export interface ApiSuccess<T> {
   data: T;
