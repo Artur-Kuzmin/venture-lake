@@ -8,6 +8,7 @@ import { sendData } from './lib/response.js';
 import authRoutes from './routes/auth.js';
 import profileRoutes from './routes/profile.js';
 import queueRoutes from './routes/queue.js';
+import matchmakingRoutes from './routes/matchmaking.js';
 import partyRoutes from './routes/party.js';
 import teamsRoutes from './routes/teams.js';
 import missionsRoutes from './routes/missions.js';
@@ -30,6 +31,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/queue', queueRoutes);
+app.use('/api/matchmaking', matchmakingRoutes);
 app.use('/api/party', partyRoutes);
 app.use('/api/teams', teamsRoutes);
 app.use('/api/missions', missionsRoutes);
