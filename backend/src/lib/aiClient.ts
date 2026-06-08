@@ -40,6 +40,11 @@ export interface RegenerateIdeaInput extends GenerateIdeaInput {
   generationNumber: number;
 }
 
+export interface GenerateDeliverablesInput {
+  mission: { title: string; brief: string };
+  profiles: ProfileInputForAi[];
+}
+
 const AI_API_KEY = process.env.AI_API_KEY ?? '';
 const AI_MODEL = process.env.AI_MODEL ?? 'claude-opus-4-8';
 
@@ -214,6 +219,53 @@ function fallbackIdea(
   };
 }
 
+// ---- Deliverables --------------------------------------------------------
+
+const ROLE_TO_DELIVERABLE: Record<string, { title: string; description: string }> = {
+  BUILDER: { title: 'Build a working prototype', description: 'Implement a functional prototype slice' },
+  DESIGNER: { title: 'Design the product UI', description: 'Create the key screens and visual design' },
+  GROWTH_SALES: {
+    title: 'Craft the go-to-market',
+    description: 'Write the landing copy and a short outreach/launch plan',
+  },
+  BUSINESS_OPERATIONS: {
+    title: 'Prepare the business case',
+    description: 'Draft the pitch, market sizing, and operations plan',
+  },
+};
+
+function assertDeliverables(value: unknown): DeliverableResult[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error('AI returned malformed deliverables.');
+  }
+  return value.map((d) => {
+    const v = d as Partial<DeliverableResult>;
+    if (typeof v.title !== 'string' || typeof v.description !== 'string' || !v.title.trim()) {
+      throw new Error('AI returned a malformed deliverable.');
+    }
+    return { title: v.title, description: v.description };
+  });
+}
+
+// One deliverable per member, themed to their primary role, so every member is
+// meaningfully involved and the captain has a natural owner for each.
+function fallbackDeliverables(input: GenerateDeliverablesInput): DeliverableResult[] {
+  const used = new Map<string, number>();
+  return input.profiles.map((p) => {
+    const tmpl = ROLE_TO_DELIVERABLE[p.primaryRole] ?? {
+      title: 'Contribute to the mission',
+      description: 'Own a concrete piece of the deliverable',
+    };
+    const count = (used.get(tmpl.title) ?? 0) + 1;
+    used.set(tmpl.title, count);
+    const suffix = count > 1 ? ` (${count})` : '';
+    return {
+      title: `${tmpl.title}${suffix}`,
+      description: `${tmpl.description} for "${input.mission.title}".`,
+    };
+  });
+}
+
 // ---- Public client -------------------------------------------------------
 
 export const aiClient = {
@@ -250,8 +302,36 @@ export const aiClient = {
     );
   },
 
-  async generateDeliverables(): Promise<DeliverableResult[]> {
-    throw new Error('aiClient.generateDeliverables not implemented yet (Phase 5.2)');
+  async generateDeliverables(input: GenerateDeliverablesInput): Promise<DeliverableResult[]> {
+    if (AI_API_KEY) {
+      const system =
+        'You break a startup mission into deliverables for a founder team. Reply with ONLY a ' +
+        'JSON array of objects, each with exactly the string keys: title, description. No prose, ' +
+        'no markdown, no code fences.';
+      const user =
+        `Mission: ${input.mission.title}\n${input.mission.brief}\n\n` +
+        `${summariseTeam(input.profiles)}\n\n` +
+        `Produce ${input.profiles.length} concrete 72-hour deliverables that together ` +
+        'meaningfully involve every team member and span their skills.';
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': AI_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: AI_MODEL,
+          max_tokens: 800,
+          system,
+          messages: [{ role: 'user', content: user }],
+        }),
+      });
+      if (!res.ok) throw new Error(`AI provider error (${res.status}).`);
+      const data = (await res.json()) as { content?: { text?: string }[] };
+      return assertDeliverables(parseStrictJson(data.content?.[0]?.text ?? ''));
+    }
+    return fallbackDeliverables(input);
   },
 };
 

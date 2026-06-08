@@ -29,6 +29,7 @@ export default function TeamPage() {
   const [noMode, setNoMode] = useState(false);
   const [rejectReason, setRejectReason] = useState(REJECT_REASONS[0]);
   const [note, setNote] = useState('');
+  const [ownerByIndex, setOwnerByIndex] = useState<Record<number, string>>({});
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
@@ -75,6 +76,23 @@ export default function TeamPage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
 
+  // Seed the owner dropdowns from the saved assignments; preserve in-progress
+  // edits by only re-seeding when the mission or its assignment set changes.
+  const mission = team?.mission ?? null;
+  useEffect(() => {
+    if (!mission) {
+      setOwnerByIndex({});
+      return;
+    }
+    const init: Record<number, string> = {};
+    mission.deliverables.forEach((d, i) => {
+      const a = mission.assignments.find((x) => x.title === d.title) ?? mission.assignments[i];
+      init[i] = a?.assignedToId ?? '';
+    });
+    setOwnerByIndex(init);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mission?.id, mission?.assignments.length]);
+
   async function run(action: () => Promise<unknown>, fallback: string) {
     setError(null);
     setBusy(true);
@@ -98,6 +116,19 @@ export default function TeamPage() {
     run(() => api.post(`/api/teams/${teamId}/captain/nominate`), 'Could not self-nominate.');
   const voteCaptain = (candidateId: string) =>
     run(() => api.post(`/api/teams/${teamId}/captain/vote`, { candidateId }), 'Could not vote.');
+  const generateDeliverables = () =>
+    run(() => api.post(`/api/teams/${teamId}/generate-deliverables`), 'Could not generate deliverables.');
+  const saveAssignments = () =>
+    run(() => {
+      const m = team!.mission!;
+      return api.put(`/api/missions/${m.id}/deliverable-assignments`, {
+        assignments: m.deliverables.map((d, i) => ({
+          title: d.title,
+          description: d.description,
+          assignedToId: ownerByIndex[i],
+        })),
+      });
+    }, 'Could not save assignments.');
 
   function voteYes(ideaId: string) {
     return run(() => api.post(`/api/mission-ideas/${ideaId}/vote`, { vote: 'YES' }), 'Could not vote.');
@@ -165,6 +196,10 @@ export default function TeamPage() {
     team.members.find((m) => m.userId === id)?.displayName ??
     captainVote?.nominees.find((n) => n.userId === id)?.displayName ??
     'Unknown';
+  const isCaptain = team.captainId === team.currentUserId;
+  const allAssigned = mission
+    ? mission.deliverables.every((_, i) => Boolean(ownerByIndex[i]))
+    : false;
 
   return (
     <div className="page">
@@ -311,9 +346,72 @@ export default function TeamPage() {
         <section className="queue-state">
           <h2>Captain selection</h2>
           {captainVote.captainId ? (
-            <p>
-              <strong>Captain: {nameOf(captainVote.captainId)}.</strong> Deliverables are next.
-            </p>
+            <>
+              <p>
+                <strong>Captain: {nameOf(captainVote.captainId)}.</strong>
+              </p>
+              {!mission ? (
+                isCaptain ? (
+                  <button type="button" onClick={generateDeliverables} disabled={busy}>
+                    {busy ? 'Generating…' : 'Generate deliverables'}
+                  </button>
+                ) : (
+                  <p className="placeholder">Waiting for the captain to generate deliverables.</p>
+                )
+              ) : (
+                <div className="deliverables">
+                  <h3>Deliverables</h3>
+                  <ul className="party-members">
+                    {mission.deliverables.map((d, i) => (
+                      <li key={i}>
+                        <strong>{d.title}</strong> — {d.description}
+                        <div className="deliverable-owner">
+                          Owner:{' '}
+                          {isCaptain ? (
+                            <select
+                              value={ownerByIndex[i] ?? ''}
+                              onChange={(e) =>
+                                setOwnerByIndex((p) => ({ ...p, [i]: e.target.value }))
+                              }
+                            >
+                              <option value="">— select —</option>
+                              {team.members.map((m) => (
+                                <option key={m.userId} value={m.userId}>
+                                  {m.displayName}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span>{ownerByIndex[i] ? nameOf(ownerByIndex[i]) : 'unassigned'}</span>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  {isCaptain && (
+                    <div className="vote-actions">
+                      <button type="button" onClick={saveAssignments} disabled={busy || !allAssigned}>
+                        {busy ? 'Saving…' : 'Save assignments'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={generateDeliverables}
+                        disabled={busy}
+                        className="link-button"
+                      >
+                        Regenerate
+                      </button>
+                    </div>
+                  )}
+                  {mission.assignments.length > 0 &&
+                    mission.assignments.length === mission.deliverables.length && (
+                      <p className="placeholder">
+                        All deliverables assigned. The mission can start next.
+                      </p>
+                    )}
+                </div>
+              )}
+            </>
           ) : (
             <>
               <p className="placeholder">

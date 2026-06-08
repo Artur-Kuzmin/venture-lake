@@ -159,6 +159,27 @@ export interface CaptainVoteState {
   myVote: string | null;
 }
 
+export interface DeliverableView {
+  title: string;
+  description: string;
+}
+
+export interface DeliverableAssignmentView {
+  title: string;
+  description: string;
+  assignedToId: string;
+  assignedToName: string;
+}
+
+export interface MissionDraft {
+  id: string;
+  title: string;
+  brief: string;
+  durationHours: number;
+  deliverables: DeliverableView[];
+  assignments: DeliverableAssignmentView[];
+}
+
 // Returned by GET /api/teams/:id.
 export interface TeamDetail {
   id: string;
@@ -171,6 +192,7 @@ export interface TeamDetail {
   members: TeamMemberView[];
   currentIdea: MissionIdeaView | null;
   rejectedIdeaCount: number;
+  mission: MissionDraft | null;
 }
 
 export interface TeamMessageView {

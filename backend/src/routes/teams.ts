@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 
 import { prisma } from '../lib/prisma.js';
 import { sendData, ApiError } from '../lib/response.js';
@@ -64,18 +65,44 @@ function serializeTeam(team: LoadedTeam, currentUserId: string) {
 // Team detail enriched with the current mission idea (+ visible votes) and the
 // number of rejected ideas so far.
 async function buildTeamDetail(team: LoadedTeam, currentUserId: string) {
-  const [idea, rejectedIdeaCount] = await Promise.all([
+  const [idea, rejectedIdeaCount, mission] = await Promise.all([
     prisma.missionIdea.findFirst({
       where: { teamId: team.id },
       orderBy: { createdAt: 'desc' },
       include: { votes: { include: { user: { select: { id: true, displayName: true } } } } },
     }),
     prisma.missionIdea.count({ where: { teamId: team.id, status: 'REJECTED' } }),
+    prisma.mission.findFirst({
+      where: { teamId: team.id },
+      orderBy: { startedAt: 'desc' },
+      include: {
+        deliverableAssignments: {
+          include: { assignedTo: { select: { id: true, displayName: true } } },
+        },
+      },
+    }),
   ]);
+
+  const deliverables = (mission?.deliverables ?? []) as { title: string; description: string }[];
 
   return {
     ...serializeTeam(team, currentUserId),
     rejectedIdeaCount,
+    mission: mission
+      ? {
+          id: mission.id,
+          title: mission.title,
+          brief: mission.brief,
+          durationHours: mission.durationHours,
+          deliverables,
+          assignments: mission.deliverableAssignments.map((a) => ({
+            title: a.title,
+            description: a.description,
+            assignedToId: a.assignedToId,
+            assignedToName: a.assignedTo.displayName,
+          })),
+        }
+      : null,
     currentIdea: idea
       ? {
           id: idea.id,
@@ -412,6 +439,80 @@ router.get(
     const userId = req.user!.userId;
     const team = await requireMember(req.params.id, userId);
     sendData(res, await buildCaptainVote(team, userId));
+  })
+);
+
+// POST /api/teams/:id/generate-deliverables — captain-only. AI-generates the
+// deliverables for the accepted idea and creates (or refreshes) the mission
+// record that holds them. The mission timer is not started until Phase 5.3.
+router.post(
+  '/:id/generate-deliverables',
+  asyncHandler(async (req, res) => {
+    const userId = req.user!.userId;
+    const team = await requireMember(req.params.id, userId);
+
+    if (team.status !== 'CAPTAIN_VOTING') {
+      throw new ApiError(409, 'NOT_IN_CAPTAIN_VOTING', 'Deliverables are generated during captain setup.');
+    }
+    if (!team.captainId) {
+      throw new ApiError(409, 'NO_CAPTAIN', 'A captain must be selected first.');
+    }
+    if (team.captainId !== userId) {
+      throw new ApiError(403, 'NOT_CAPTAIN', 'Only the captain can generate deliverables.');
+    }
+
+    const idea = await prisma.missionIdea.findFirst({
+      where: { teamId: team.id, status: 'ACCEPTED' },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!idea) throw new ApiError(409, 'NO_ACCEPTED_IDEA', 'No accepted mission idea.');
+
+    const profiles = await prisma.founderProfile.findMany({
+      where: { userId: { in: team.members.map((m) => m.userId) } },
+    });
+    const deliverables = await aiClient.generateDeliverables({
+      mission: { title: idea.title, brief: idea.description },
+      profiles,
+    });
+    const deliverablesJson = deliverables as unknown as Prisma.InputJsonValue;
+
+    // Mission requires a deadline; use a placeholder until Phase 5.3 starts it.
+    const durationHours = 72;
+    const now = new Date();
+    const deadlineAt = new Date(now.getTime() + durationHours * 3600 * 1000);
+
+    const existing = await prisma.mission.findFirst({
+      where: { teamId: team.id },
+      orderBy: { startedAt: 'desc' },
+    });
+
+    if (existing) {
+      // Regenerate: refresh deliverables and clear stale owner assignments.
+      await prisma.$transaction([
+        prisma.deliverableAssignment.deleteMany({ where: { missionId: existing.id } }),
+        prisma.mission.update({
+          where: { id: existing.id },
+          data: { title: idea.title, brief: idea.description, deliverables: deliverablesJson },
+        }),
+      ]);
+    } else {
+      await prisma.mission.create({
+        data: {
+          teamId: team.id,
+          missionIdeaId: idea.id,
+          title: idea.title,
+          brief: idea.description,
+          durationHours,
+          deliverables: deliverablesJson,
+          status: 'ACTIVE',
+          startedAt: now,
+          deadlineAt,
+        },
+      });
+    }
+
+    const updated = await loadTeam(team.id);
+    sendData(res, await buildTeamDetail(updated!, userId), 201);
   })
 );
 

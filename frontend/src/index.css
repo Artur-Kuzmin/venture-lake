@@ -239,3 +239,18 @@ button:disabled {
   border-radius: 6px;
   font: inherit;
 }
+
+.deliverables .party-members li {
+  margin-bottom: 0.6rem;
+}
+
+.deliverable-owner {
+  margin-top: 0.25rem;
+}
+
+.deliverable-owner select {
+  padding: 0.3rem;
+  border: 1px solid #cbd2dc;
+  border-radius: 6px;
+  font: inherit;
+}
