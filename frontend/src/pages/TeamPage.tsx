@@ -218,6 +218,17 @@ export default function TeamPage() {
       });
   }
 
+  function requeueIndividually() {
+    setBusy(true);
+    api
+      .post('/api/queue/join')
+      .then(() => navigate('/lobby'))
+      .catch((err) => {
+        setError(err instanceof ApiError ? err.message : 'Could not requeue.');
+        setBusy(false);
+      });
+  }
+
   if (loading) {
     return (
       <div className="page">
@@ -615,6 +626,19 @@ export default function TeamPage() {
               <strong>Notes:</strong> {team.submission.notes}
             </p>
           )}
+        </section>
+      )}
+
+      {team.status === 'FAILED' && (
+        <section className="queue-state">
+          <h2>Mission failed</h2>
+          <p>
+            The 72-hour deadline passed without a submission, so this session has ended. No penalty —
+            you can jump back into the queue.
+          </p>
+          <button type="button" onClick={requeueIndividually} disabled={busy}>
+            {busy ? 'Requeuing…' : 'Requeue individually'}
+          </button>
         </section>
       )}
 

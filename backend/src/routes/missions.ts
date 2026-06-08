@@ -7,11 +7,22 @@ import { sendData, ApiError } from '../lib/response.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireProfile } from '../middleware/requireProfile.js';
+import { expireOverdueMissions } from '../services/missionExpiry.js';
 
 // Mission routes. Phase 5.2: captain assigns owners to the generated
 // deliverables. Mission start (5.3) and submission (6.1) come later.
 const router = Router();
 router.use(requireAuth, requireProfile);
+
+// POST /api/missions/expire-overdue — dev/admin trigger to fail missions whose
+// deadline has passed without a submission (also runs on an interval; Phase 6.2).
+router.post(
+  '/expire-overdue',
+  asyncHandler(async (_req, res) => {
+    const result = await expireOverdueMissions();
+    sendData(res, result);
+  })
+);
 
 const assignmentsSchema = z.object({
   assignments: z

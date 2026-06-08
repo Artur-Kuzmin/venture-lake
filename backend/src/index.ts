@@ -4,6 +4,7 @@ import cors from 'cors';
 
 import { errorHandler } from './middleware/errorHandler.js';
 import { sendData } from './lib/response.js';
+import { expireOverdueMissions } from './services/missionExpiry.js';
 
 import authRoutes from './routes/auth.js';
 import profileRoutes from './routes/profile.js';
@@ -48,5 +49,11 @@ const port = Number(process.env.PORT ?? 4000);
 app.listen(port, () => {
   console.log(`[venturelake-backend] listening on http://localhost:${port}`);
 });
+
+// Background job: auto-fail missions past their deadline without a submission.
+const EXPIRY_INTERVAL_MS = 5 * 60 * 1000;
+setInterval(() => {
+  expireOverdueMissions().catch((err) => console.error('[missionExpiry]', err));
+}, EXPIRY_INTERVAL_MS);
 
 export default app;
