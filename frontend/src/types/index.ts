@@ -225,6 +225,29 @@ export interface VCMe {
   reviewCooldownUntil: string | null;
 }
 
+export type VCAssignmentStatus = 'ASSIGNED' | 'ACCEPTED' | 'COMPLETED' | 'EXPIRED' | 'PASSED';
+
+// Anonymized review assignment (GET /api/vc/current-assignment, queue/enter).
+// Contains NO team or member identities.
+export interface VCAssignmentView {
+  assignmentId: string;
+  status: VCAssignmentStatus;
+  deadlineAt: string | null;
+  isAppealReview: boolean;
+  missionTitle: string;
+  missionBrief: string;
+  deliverables: { title: string; description: string }[];
+  submission: {
+    summary: string;
+    pitchText: string | null;
+    prototypeUrl: string | null;
+    demoUrl: string | null;
+    landingPageUrl: string | null;
+    links: string[];
+    notes: string | null;
+  };
+}
+
 // Standard API envelopes (Foundation Bible, Section 4.5).
 export interface ApiSuccess<T> {
   data: T;
