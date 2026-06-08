@@ -76,7 +76,14 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="/team/:teamId" element={<TeamPage />} />
+        <Route
+          path="/team/:teamId"
+          element={
+            <ProtectedRoute>
+              <TeamPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/vc" element={<VCPage />} />
         <Route path="/showcase" element={<ShowcasePage />} />
         <Route path="/admin" element={<AdminPage />} />

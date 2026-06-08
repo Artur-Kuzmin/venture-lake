@@ -228,6 +228,7 @@ model TeamMember {
   team     Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
   userId   String
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ready    Boolean   @default(false)
   joinedAt DateTime  @default(now())
   leftAt   DateTime?
 

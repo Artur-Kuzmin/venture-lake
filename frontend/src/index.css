@@ -177,3 +177,40 @@ button:disabled {
   color: #2563eb;
   font-size: 0.85rem;
 }
+
+.match-explanation {
+  max-width: 640px;
+}
+
+.chat {
+  width: 100%;
+  max-width: 640px;
+}
+
+.chat-log {
+  width: 100%;
+  height: 240px;
+  overflow-y: auto;
+  border: 1px solid #e2e5ec;
+  border-radius: 6px;
+  padding: 0.5rem;
+  background: #fff;
+}
+
+.chat-line {
+  padding: 0.15rem 0;
+}
+
+.chat-form {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.chat-form input {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid #cbd2dc;
+  border-radius: 6px;
+  font: inherit;
+}

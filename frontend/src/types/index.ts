@@ -111,6 +111,34 @@ export interface Party {
   members: PartyMemberView[];
 }
 
+export interface TeamMemberView {
+  userId: string;
+  displayName: string;
+  ready: boolean;
+  isCaptain: boolean;
+  joinedAt: string;
+}
+
+// Returned by GET /api/teams/:id.
+export interface TeamDetail {
+  id: string;
+  status: TeamStatus;
+  captainId: string | null;
+  matchExplanation: string | null;
+  missionStartedAt: string | null;
+  missionDeadlineAt: string | null;
+  currentUserId: string;
+  members: TeamMemberView[];
+}
+
+export interface TeamMessageView {
+  id: string;
+  userId: string;
+  displayName: string;
+  body: string;
+  createdAt: string;
+}
+
 // Standard API envelopes (Foundation Bible, Section 4.5).
 export interface ApiSuccess<T> {
   data: T;
