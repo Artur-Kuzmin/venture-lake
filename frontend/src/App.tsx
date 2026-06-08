@@ -84,9 +84,23 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="/vc" element={<VCPage />} />
+        <Route
+          path="/vc"
+          element={
+            <ProtectedRoute>
+              <VCPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/showcase" element={<ShowcasePage />} />
-        <Route path="/admin" element={<AdminPage />} />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="*" element={<Navigate to="/showcase" replace />} />
       </Routes>
     </div>

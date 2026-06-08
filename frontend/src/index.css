@@ -283,3 +283,11 @@ button:disabled {
   border-radius: 6px;
   font: inherit;
 }
+
+.admin-input {
+  padding: 0.5rem;
+  border: 1px solid #cbd2dc;
+  border-radius: 6px;
+  font: inherit;
+  min-width: 280px;
+}

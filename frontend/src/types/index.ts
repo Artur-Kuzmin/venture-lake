@@ -218,6 +218,13 @@ export interface TeamMessageView {
   createdAt: string;
 }
 
+// Returned by GET /api/vc/me.
+export interface VCMe {
+  approved: boolean;
+  approvedAt: string | null;
+  reviewCooldownUntil: string | null;
+}
+
 // Standard API envelopes (Foundation Bible, Section 4.5).
 export interface ApiSuccess<T> {
   data: T;
