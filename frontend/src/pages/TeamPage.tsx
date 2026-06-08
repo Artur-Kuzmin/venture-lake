@@ -43,6 +43,14 @@ export default function TeamPage() {
   const [note, setNote] = useState('');
   const [ownerByIndex, setOwnerByIndex] = useState<Record<number, string>>({});
   const [now, setNow] = useState(() => Date.now());
+  const [submitForm, setSubmitForm] = useState({
+    summary: '',
+    pitchText: '',
+    prototypeUrl: '',
+    landingPageUrl: '',
+    links: '',
+    notes: '',
+  });
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
@@ -150,6 +158,25 @@ export default function TeamPage() {
     }, 'Could not save assignments.');
   const startMission = () =>
     run(() => api.post(`/api/teams/${teamId}/start-mission`), 'Could not start the mission.');
+  const submitMission = () =>
+    run(() => {
+      const m = team!.mission!;
+      return api.post(`/api/missions/${m.id}/submit`, {
+        summary: submitForm.summary,
+        pitchText: submitForm.pitchText || undefined,
+        prototypeUrl: submitForm.prototypeUrl || undefined,
+        landingPageUrl: submitForm.landingPageUrl || undefined,
+        links: submitForm.links
+          .split('\n')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        notes: submitForm.notes || undefined,
+      });
+    }, 'Could not submit the final package.');
+  const setSubmitField =
+    (key: keyof typeof submitForm) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setSubmitForm((p) => ({ ...p, [key]: e.target.value }));
 
   function voteYes(ideaId: string) {
     return run(() => api.post(`/api/mission-ideas/${ideaId}/vote`, { vote: 'YES' }), 'Could not vote.');
@@ -501,9 +528,92 @@ export default function TeamPage() {
 
           <h3>Final submission</h3>
           {isCaptain ? (
-            <p className="placeholder">Captain submission opens next (Phase 6).</p>
+            <div className="submit-form">
+              <label>
+                Summary *
+                <textarea value={submitForm.summary} onChange={setSubmitField('summary')} rows={3} />
+              </label>
+              <label>
+                Pitch
+                <textarea value={submitForm.pitchText} onChange={setSubmitField('pitchText')} rows={2} />
+              </label>
+              <label>
+                Prototype / demo URL
+                <input
+                  value={submitForm.prototypeUrl}
+                  onChange={setSubmitField('prototypeUrl')}
+                  placeholder="https://"
+                />
+              </label>
+              <label>
+                Landing page URL
+                <input
+                  value={submitForm.landingPageUrl}
+                  onChange={setSubmitField('landingPageUrl')}
+                  placeholder="https://"
+                />
+              </label>
+              <label>
+                File / resource links (one per line)
+                <textarea value={submitForm.links} onChange={setSubmitField('links')} rows={2} />
+              </label>
+              <label>
+                Notes
+                <textarea value={submitForm.notes} onChange={setSubmitField('notes')} rows={2} />
+              </label>
+              <button
+                type="button"
+                onClick={submitMission}
+                disabled={busy || !submitForm.summary.trim()}
+              >
+                {busy ? 'Submitting…' : 'Submit final package'}
+              </button>
+            </div>
           ) : (
             <p className="placeholder">Your captain will submit the final package.</p>
+          )}
+        </section>
+      )}
+
+      {team.status === 'SUBMITTED' && team.submission && (
+        <section className="queue-state">
+          <h2>Submitted — awaiting VC review</h2>
+          <p className="placeholder">Submitted by {team.submission.submittedByName}.</p>
+          <p>
+            <strong>Summary:</strong> {team.submission.summary}
+          </p>
+          {team.submission.pitchText && (
+            <p>
+              <strong>Pitch:</strong> {team.submission.pitchText}
+            </p>
+          )}
+          {team.submission.prototypeUrl && (
+            <p>
+              Prototype / demo:{' '}
+              <a href={team.submission.prototypeUrl} target="_blank" rel="noreferrer">
+                {team.submission.prototypeUrl}
+              </a>
+            </p>
+          )}
+          {team.submission.landingPageUrl && (
+            <p>
+              Landing page:{' '}
+              <a href={team.submission.landingPageUrl} target="_blank" rel="noreferrer">
+                {team.submission.landingPageUrl}
+              </a>
+            </p>
+          )}
+          {team.submission.links.length > 0 && (
+            <ul className="party-members">
+              {team.submission.links.map((l, i) => (
+                <li key={i}>{l}</li>
+              ))}
+            </ul>
+          )}
+          {team.submission.notes && (
+            <p>
+              <strong>Notes:</strong> {team.submission.notes}
+            </p>
           )}
         </section>
       )}

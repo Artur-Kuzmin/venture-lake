@@ -261,3 +261,25 @@ button:disabled {
   font-variant-numeric: tabular-nums;
   margin: 0;
 }
+
+.submit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: 100%;
+}
+
+.submit-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 500;
+}
+
+.submit-form input,
+.submit-form textarea {
+  padding: 0.5rem;
+  border: 1px solid #cbd2dc;
+  border-radius: 6px;
+  font: inherit;
+}

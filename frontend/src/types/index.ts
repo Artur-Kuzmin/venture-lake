@@ -180,6 +180,20 @@ export interface MissionDraft {
   assignments: DeliverableAssignmentView[];
 }
 
+export interface SubmissionView {
+  id: string;
+  summary: string;
+  pitchText: string | null;
+  prototypeUrl: string | null;
+  demoUrl: string | null;
+  landingPageUrl: string | null;
+  links: string[];
+  notes: string | null;
+  status: 'SUBMITTED' | 'UNDER_REVIEW' | 'FINAL';
+  submittedByName: string;
+  submittedAt: string;
+}
+
 // Returned by GET /api/teams/:id.
 export interface TeamDetail {
   id: string;
@@ -193,6 +207,7 @@ export interface TeamDetail {
   currentIdea: MissionIdeaView | null;
   rejectedIdeaCount: number;
   mission: MissionDraft | null;
+  submission: SubmissionView | null;
 }
 
 export interface TeamMessageView {

@@ -65,7 +65,7 @@ function serializeTeam(team: LoadedTeam, currentUserId: string) {
 // Team detail enriched with the current mission idea (+ visible votes) and the
 // number of rejected ideas so far.
 async function buildTeamDetail(team: LoadedTeam, currentUserId: string) {
-  const [idea, rejectedIdeaCount, mission] = await Promise.all([
+  const [idea, rejectedIdeaCount, mission, submission] = await Promise.all([
     prisma.missionIdea.findFirst({
       where: { teamId: team.id },
       orderBy: { createdAt: 'desc' },
@@ -81,13 +81,34 @@ async function buildTeamDetail(team: LoadedTeam, currentUserId: string) {
         },
       },
     }),
+    prisma.missionSubmission.findFirst({
+      where: { teamId: team.id },
+      orderBy: { submittedAt: 'desc' },
+      include: { submittedBy: { select: { displayName: true } } },
+    }),
   ]);
 
   const deliverables = (mission?.deliverables ?? []) as { title: string; description: string }[];
+  const subFiles = (submission?.files ?? null) as { links?: string[]; notes?: string | null } | null;
 
   return {
     ...serializeTeam(team, currentUserId),
     rejectedIdeaCount,
+    submission: submission
+      ? {
+          id: submission.id,
+          summary: submission.summary,
+          pitchText: submission.pitchText,
+          prototypeUrl: submission.prototypeUrl,
+          demoUrl: submission.demoUrl,
+          landingPageUrl: submission.landingPageUrl,
+          links: subFiles?.links ?? [],
+          notes: subFiles?.notes ?? null,
+          status: submission.status,
+          submittedByName: submission.submittedBy.displayName,
+          submittedAt: submission.submittedAt,
+        }
+      : null,
     mission: mission
       ? {
           id: mission.id,
