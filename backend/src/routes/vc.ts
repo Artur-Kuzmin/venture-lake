@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 
 import { prisma } from '../lib/prisma.js';
@@ -184,6 +185,118 @@ router.get(
     await assertApprovedVc(userId);
     const assignment = await findActiveAssignment(userId);
     sendData(res, assignment ? buildAssignmentView(assignment) : null);
+  })
+);
+
+// ---- Review form (Phase 7.3) ---------------------------------------------
+
+const REVIEW_CATEGORIES = [
+  'Clarity of idea',
+  'Execution quality',
+  'Market potential',
+  'Presentation quality',
+  'Use of team skills',
+] as const;
+
+const reviewSchema = z.object({
+  categories: z
+    .array(
+      z.object({
+        category: z.enum(REVIEW_CATEGORIES),
+        score: z.number().int().min(1).max(10),
+        feedback: z.string(),
+      })
+    )
+    .length(REVIEW_CATEGORIES.length),
+});
+
+// Quality checks on per-category feedback. Returns an error message or null.
+function feedbackQualityError(feedback: string): string | null {
+  const t = feedback.trim();
+  if (t.length === 0) return 'feedback cannot be empty';
+  if (t.length < 15) return 'feedback is too short (min 15 characters)';
+  const words = t.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return 'feedback cannot be a single word';
+  const uniqueWords = new Set(words.map((w) => w.toLowerCase())).size;
+  if (uniqueWords / words.length < 0.5) return 'feedback looks like repeated text';
+  const uniqueChars = new Set(t.replace(/\s/g, '').toLowerCase()).size;
+  if (uniqueChars < 5) return 'feedback looks like spam';
+  return null;
+}
+
+// POST /api/vc/assignments/:id/review — submit the category review.
+router.post(
+  '/assignments/:id/review',
+  asyncHandler(async (req, res) => {
+    const userId = req.user!.userId;
+    await assertApprovedVc(userId);
+
+    const assignment = await prisma.vCReviewAssignment.findUnique({
+      where: { id: req.params.id },
+      include: { submission: { select: { teamId: true } } },
+    });
+    if (!assignment) throw new ApiError(404, 'ASSIGNMENT_NOT_FOUND', 'Assignment not found.');
+    if (assignment.vcUserId !== userId) {
+      throw new ApiError(403, 'NOT_YOUR_ASSIGNMENT', 'This assignment is not yours.');
+    }
+    if (assignment.status !== 'ACCEPTED') {
+      throw new ApiError(409, 'ASSIGNMENT_NOT_ACCEPTED', 'Accept the assignment before reviewing.');
+    }
+    if (assignment.deadlineAt && new Date() > assignment.deadlineAt) {
+      throw new ApiError(409, 'DEADLINE_PASSED', 'The 6-hour review window has passed.');
+    }
+
+    const { categories } = reviewSchema.parse(req.body);
+
+    if (new Set(categories.map((c) => c.category)).size !== REVIEW_CATEGORIES.length) {
+      throw new ApiError(400, 'INVALID_CATEGORIES', 'All five categories must be scored exactly once.');
+    }
+    for (const c of categories) {
+      const err = feedbackQualityError(c.feedback);
+      if (err) throw new ApiError(400, 'INVALID_FEEDBACK', `${c.category}: ${err}.`);
+    }
+
+    const overallScore =
+      (categories.reduce((sum, c) => sum + c.score, 0) / categories.length) * 10;
+
+    const review = await prisma.$transaction(async (tx) => {
+      const created = await tx.vCReview.create({
+        data: {
+          submissionId: assignment.submissionId,
+          vcUserId: userId,
+          assignmentId: assignment.id,
+          isAppealReview: assignment.isAppealReview,
+          overallScore,
+          status: 'VALID',
+          categories: {
+            create: categories.map((c) => ({
+              category: c.category,
+              score: c.score,
+              feedback: c.feedback.trim(),
+            })),
+          },
+        },
+      });
+      await tx.vCReviewAssignment.update({
+        where: { id: assignment.id },
+        data: { status: 'COMPLETED', completedAt: new Date() },
+      });
+      // First review: leave the queue and mark the team under review. The
+      // appeal-window transition is handled in Phase 8.1.
+      if (!assignment.isAppealReview) {
+        await tx.missionSubmission.update({
+          where: { id: assignment.submissionId },
+          data: { status: 'UNDER_REVIEW' },
+        });
+        await tx.team.update({
+          where: { id: assignment.submission.teamId },
+          data: { status: 'UNDER_REVIEW' },
+        });
+      }
+      return created;
+    });
+
+    sendData(res, { reviewId: review.id, overallScore, status: review.status }, 201);
   })
 );
 
