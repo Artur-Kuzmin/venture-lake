@@ -15,6 +15,18 @@ const REJECT_REASONS = [
   'Other',
 ];
 
+// Formats a remaining duration (ms) as "Dd HH:MM:SS", or "Time's up".
+function formatRemaining(ms: number): string {
+  if (ms <= 0) return "Time's up";
+  const s = Math.floor(ms / 1000);
+  const days = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${days}d ${pad(h)}:${pad(m)}:${pad(sec)}`;
+}
+
 // Team lobby + idea voting. Backend enforces membership and all transitions.
 export default function TeamPage() {
   const { teamId } = useParams();
@@ -30,6 +42,7 @@ export default function TeamPage() {
   const [rejectReason, setRejectReason] = useState(REJECT_REASONS[0]);
   const [note, setNote] = useState('');
   const [ownerByIndex, setOwnerByIndex] = useState<Record<number, string>>({});
+  const [now, setNow] = useState(() => Date.now());
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
@@ -75,6 +88,12 @@ export default function TeamPage() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
+
+  // Tick the mission countdown once a second.
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   // Seed the owner dropdowns from the saved assignments; preserve in-progress
   // edits by only re-seeding when the mission or its assignment set changes.
@@ -129,6 +148,8 @@ export default function TeamPage() {
         })),
       });
     }, 'Could not save assignments.');
+  const startMission = () =>
+    run(() => api.post(`/api/teams/${teamId}/start-mission`), 'Could not start the mission.');
 
   function voteYes(ideaId: string) {
     return run(() => api.post(`/api/mission-ideas/${ideaId}/vote`, { vote: 'YES' }), 'Could not vote.');
@@ -200,6 +221,9 @@ export default function TeamPage() {
   const allAssigned = mission
     ? mission.deliverables.every((_, i) => Boolean(ownerByIndex[i]))
     : false;
+  const deliverablesAssigned = mission
+    ? mission.deliverables.length > 0 && mission.assignments.length === mission.deliverables.length
+    : false;
 
   return (
     <div className="page">
@@ -238,7 +262,7 @@ export default function TeamPage() {
         )}
       </section>
 
-      {idea && team.status !== 'LOBBY' && (
+      {idea && (team.status === 'IDEA_VOTING' || team.status === 'CAPTAIN_VOTING') && (
         <section className="queue-state idea-card">
           <h2>
             Mission idea <span className="badge">#{idea.generationNumber}</span>
@@ -403,12 +427,14 @@ export default function TeamPage() {
                       </button>
                     </div>
                   )}
-                  {mission.assignments.length > 0 &&
-                    mission.assignments.length === mission.deliverables.length && (
-                      <p className="placeholder">
-                        All deliverables assigned. The mission can start next.
-                      </p>
-                    )}
+                  {deliverablesAssigned && (
+                    <p className="placeholder">All deliverables assigned.</p>
+                  )}
+                  {isCaptain && deliverablesAssigned && (
+                    <button type="button" onClick={startMission} disabled={busy}>
+                      {busy ? 'Starting…' : 'Start 72-hour mission'}
+                    </button>
+                  )}
                 </div>
               )}
             </>
@@ -448,6 +474,36 @@ export default function TeamPage() {
                 </ul>
               )}
             </>
+          )}
+        </section>
+      )}
+
+      {team.status === 'MISSION_ACTIVE' && mission && (
+        <section className="queue-state mission-view">
+          <h2>Mission active</h2>
+          {team.missionDeadlineAt && (
+            <p className="timer">
+              ⏳ {formatRemaining(new Date(team.missionDeadlineAt).getTime() - now)} remaining
+            </p>
+          )}
+          <h3>{mission.title}</h3>
+          <p>{mission.brief}</p>
+
+          <h3>Deliverables</h3>
+          <ul className="party-members">
+            {mission.assignments.map((a, i) => (
+              <li key={i}>
+                <strong>{a.title}</strong> — {a.description}
+                <span className="badge"> · {a.assignedToName}</span>
+              </li>
+            ))}
+          </ul>
+
+          <h3>Final submission</h3>
+          {isCaptain ? (
+            <p className="placeholder">Captain submission opens next (Phase 6).</p>
+          ) : (
+            <p className="placeholder">Your captain will submit the final package.</p>
           )}
         </section>
       )}

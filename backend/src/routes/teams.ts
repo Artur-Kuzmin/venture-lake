@@ -516,4 +516,62 @@ router.post(
   })
 );
 
+// POST /api/teams/:id/start-mission — captain-only. Starts the 72-hour mission,
+// but only when the idea is accepted, a captain is selected, and every
+// deliverable is assigned (Phase 5.3).
+router.post(
+  '/:id/start-mission',
+  asyncHandler(async (req, res) => {
+    const userId = req.user!.userId;
+    const team = await requireMember(req.params.id, userId);
+
+    if (team.status !== 'CAPTAIN_VOTING') {
+      throw new ApiError(409, 'NOT_READY_TO_START', 'The mission cannot start from this state.');
+    }
+    if (!team.captainId) {
+      throw new ApiError(409, 'NO_CAPTAIN', 'A captain must be selected first.');
+    }
+    if (team.captainId !== userId) {
+      throw new ApiError(403, 'NOT_CAPTAIN', 'Only the captain can start the mission.');
+    }
+
+    const idea = await prisma.missionIdea.findFirst({
+      where: { teamId: team.id, status: 'ACCEPTED' },
+    });
+    if (!idea) throw new ApiError(409, 'NO_ACCEPTED_IDEA', 'No accepted mission idea.');
+
+    const mission = await prisma.mission.findFirst({
+      where: { teamId: team.id },
+      orderBy: { startedAt: 'desc' },
+      include: { deliverableAssignments: true },
+    });
+    if (!mission) throw new ApiError(409, 'NO_MISSION', 'Deliverables have not been generated.');
+
+    const deliverables = (mission.deliverables ?? []) as unknown[];
+    if (deliverables.length === 0 || mission.deliverableAssignments.length !== deliverables.length) {
+      throw new ApiError(
+        409,
+        'DELIVERABLES_NOT_ASSIGNED',
+        'Every deliverable must be assigned before the mission can start.'
+      );
+    }
+
+    const now = new Date();
+    const deadlineAt = new Date(now.getTime() + mission.durationHours * 3600 * 1000);
+    await prisma.$transaction([
+      prisma.mission.update({
+        where: { id: mission.id },
+        data: { status: 'ACTIVE', startedAt: now, deadlineAt },
+      }),
+      prisma.team.update({
+        where: { id: team.id },
+        data: { status: 'MISSION_ACTIVE', missionStartedAt: now, missionDeadlineAt: deadlineAt },
+      }),
+    ]);
+
+    const updated = await loadTeam(team.id);
+    sendData(res, await buildTeamDetail(updated!, userId));
+  })
+);
+
 export default router;

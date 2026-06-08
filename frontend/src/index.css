@@ -254,3 +254,10 @@ button:disabled {
   border-radius: 6px;
   font: inherit;
 }
+
+.timer {
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
