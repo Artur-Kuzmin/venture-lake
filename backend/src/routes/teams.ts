@@ -300,4 +300,119 @@ router.post(
   })
 );
 
+// ---- Captain selection (Phase 5.1) --------------------------------------
+
+// Captain-vote state: nominees (active members only) with tallies, the caller's
+// own nomination/vote, and the elected captain once a simple majority is reached.
+async function buildCaptainVote(team: LoadedTeam, currentUserId: string) {
+  const [nominations, votes] = await Promise.all([
+    prisma.captainNomination.findMany({
+      where: { teamId: team.id },
+      include: { user: { select: { id: true, displayName: true } } },
+    }),
+    prisma.captainVote.findMany({ where: { teamId: team.id } }),
+  ]);
+
+  const activeIds = new Set(team.members.map((m) => m.userId));
+  const nominees = nominations
+    .filter((n) => activeIds.has(n.userId))
+    .map((n) => ({
+      userId: n.userId,
+      displayName: n.user.displayName,
+      votes: votes.filter((v) => v.candidateId === n.userId).length,
+    }));
+
+  const memberCount = team.members.length;
+  return {
+    teamStatus: team.status,
+    captainId: team.captainId,
+    memberCount,
+    majorityNeeded: Math.floor(memberCount / 2) + 1,
+    nominees,
+    myNomination: nominations.some((n) => n.userId === currentUserId),
+    myVote: votes.find((v) => v.voterId === currentUserId)?.candidateId ?? null,
+  };
+}
+
+// POST /api/teams/:id/captain/nominate — the caller self-nominates (idempotent).
+router.post(
+  '/:id/captain/nominate',
+  asyncHandler(async (req, res) => {
+    const userId = req.user!.userId;
+    const team = await requireMember(req.params.id, userId);
+    if (team.status !== 'CAPTAIN_VOTING') {
+      throw new ApiError(409, 'NOT_IN_CAPTAIN_VOTING', 'The team is not selecting a captain.');
+    }
+    if (team.captainId) {
+      throw new ApiError(409, 'CAPTAIN_ALREADY_SELECTED', 'A captain has already been selected.');
+    }
+    await prisma.captainNomination.upsert({
+      where: { teamId_userId: { teamId: team.id, userId } },
+      create: { teamId: team.id, userId },
+      update: {},
+    });
+    sendData(res, await buildCaptainVote(team, userId), 201);
+  })
+);
+
+const captainVoteSchema = z.object({ candidateId: z.string().min(1) });
+
+// POST /api/teams/:id/captain/vote — vote for a nominee; simple majority wins.
+router.post(
+  '/:id/captain/vote',
+  asyncHandler(async (req, res) => {
+    const userId = req.user!.userId;
+    const team = await requireMember(req.params.id, userId);
+    if (team.status !== 'CAPTAIN_VOTING') {
+      throw new ApiError(409, 'NOT_IN_CAPTAIN_VOTING', 'The team is not selecting a captain.');
+    }
+    if (team.captainId) {
+      throw new ApiError(409, 'CAPTAIN_ALREADY_SELECTED', 'A captain has already been selected.');
+    }
+    const { candidateId } = captainVoteSchema.parse(req.body);
+
+    const nomination = await prisma.captainNomination.findUnique({
+      where: { teamId_userId: { teamId: team.id, userId: candidateId } },
+    });
+    if (!nomination || !team.members.some((m) => m.userId === candidateId)) {
+      throw new ApiError(409, 'NOT_A_NOMINEE', 'You can only vote for a nominee.');
+    }
+
+    await prisma.captainVote.upsert({
+      where: { teamId_voterId: { teamId: team.id, voterId: userId } },
+      create: { teamId: team.id, voterId: userId, candidateId },
+      update: { candidateId },
+    });
+
+    // Tally; a candidate with a simple majority of active members is elected.
+    const votes = await prisma.captainVote.findMany({ where: { teamId: team.id } });
+    const counts = new Map<string, number>();
+    for (const v of votes) counts.set(v.candidateId, (counts.get(v.candidateId) ?? 0) + 1);
+    const majorityNeeded = Math.floor(team.members.length / 2) + 1;
+    let electedId: string | null = null;
+    for (const [candidate, n] of counts) {
+      if (n >= majorityNeeded) {
+        electedId = candidate;
+        break;
+      }
+    }
+    if (electedId) {
+      await prisma.team.update({ where: { id: team.id }, data: { captainId: electedId } });
+    }
+
+    const updated = await loadTeam(team.id);
+    sendData(res, await buildCaptainVote(updated!, userId));
+  })
+);
+
+// GET /api/teams/:id/captain-vote — nominees, tallies, and the elected captain.
+router.get(
+  '/:id/captain-vote',
+  asyncHandler(async (req, res) => {
+    const userId = req.user!.userId;
+    const team = await requireMember(req.params.id, userId);
+    sendData(res, await buildCaptainVote(team, userId));
+  })
+);
+
 export default router;

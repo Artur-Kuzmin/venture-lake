@@ -142,6 +142,23 @@ export interface MissionIdeaView {
   votes: IdeaVoteView[];
 }
 
+export interface CaptainNomineeView {
+  userId: string;
+  displayName: string;
+  votes: number;
+}
+
+// Returned by the /api/teams/:id/captain* endpoints.
+export interface CaptainVoteState {
+  teamStatus: TeamStatus;
+  captainId: string | null;
+  memberCount: number;
+  majorityNeeded: number;
+  nominees: CaptainNomineeView[];
+  myNomination: boolean;
+  myVote: string | null;
+}
+
 // Returned by GET /api/teams/:id.
 export interface TeamDetail {
   id: string;

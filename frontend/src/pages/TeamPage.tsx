@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../lib/apiClient';
-import type { TeamDetail, TeamMessageView } from '../types';
+import type { CaptainVoteState, TeamDetail, TeamMessageView } from '../types';
 
 // Controlled reject reasons (Foundation Bible, Section 5).
 const REJECT_REASONS = [
@@ -20,6 +20,7 @@ export default function TeamPage() {
   const { teamId } = useParams();
   const navigate = useNavigate();
   const [team, setTeam] = useState<TeamDetail | null>(null);
+  const [captainVote, setCaptainVote] = useState<CaptainVoteState | null>(null);
   const [messages, setMessages] = useState<TeamMessageView[]>([]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(true);
@@ -38,6 +39,11 @@ export default function TeamPage() {
     ]);
     setTeam(teamRes);
     setMessages(messagesRes);
+    if (teamRes.status === 'CAPTAIN_VOTING') {
+      setCaptainVote(await api.get<CaptainVoteState>(`/api/teams/${teamId}/captain-vote`));
+    } else {
+      setCaptainVote(null);
+    }
   }, [teamId]);
 
   useEffect(() => {
@@ -88,6 +94,10 @@ export default function TeamPage() {
     run(() => api.post(`/api/teams/${teamId}/generate-idea`), 'Could not generate an idea.');
   const regenerate = () =>
     run(() => api.post(`/api/teams/${teamId}/regenerate-idea`), 'Could not regenerate.');
+  const nominateCaptain = () =>
+    run(() => api.post(`/api/teams/${teamId}/captain/nominate`), 'Could not self-nominate.');
+  const voteCaptain = (candidateId: string) =>
+    run(() => api.post(`/api/teams/${teamId}/captain/vote`, { candidateId }), 'Could not vote.');
 
   function voteYes(ideaId: string) {
     return run(() => api.post(`/api/mission-ideas/${ideaId}/vote`, { vote: 'YES' }), 'Could not vote.');
@@ -151,6 +161,10 @@ export default function TeamPage() {
   const inLobby = team.status === 'LOBBY';
   const idea = team.currentIdea;
   const voteByUser = new Map(idea?.votes.map((v) => [v.userId, v]) ?? []);
+  const nameOf = (id: string) =>
+    team.members.find((m) => m.userId === id)?.displayName ??
+    captainVote?.nominees.find((n) => n.userId === id)?.displayName ??
+    'Unknown';
 
   return (
     <div className="page">
@@ -289,6 +303,53 @@ export default function TeamPage() {
             <p>
               <strong>Idea accepted!</strong> Captain selection is next.
             </p>
+          )}
+        </section>
+      )}
+
+      {team.status === 'CAPTAIN_VOTING' && captainVote && (
+        <section className="queue-state">
+          <h2>Captain selection</h2>
+          {captainVote.captainId ? (
+            <p>
+              <strong>Captain: {nameOf(captainVote.captainId)}.</strong> Deliverables are next.
+            </p>
+          ) : (
+            <>
+              <p className="placeholder">
+                Self-nominate, then vote. Simple majority ({captainVote.majorityNeeded} of{' '}
+                {captainVote.memberCount}) wins.
+              </p>
+              {!captainVote.myNomination && (
+                <button type="button" onClick={nominateCaptain} disabled={busy}>
+                  Self-nominate
+                </button>
+              )}
+              {captainVote.nominees.length === 0 ? (
+                <p className="placeholder">No nominees yet.</p>
+              ) : (
+                <ul className="party-members">
+                  {captainVote.nominees.map((n) => (
+                    <li key={n.userId}>
+                      {n.displayName} — {n.votes} vote{n.votes === 1 ? '' : 's'}
+                      {captainVote.myVote === n.userId ? (
+                        <span className="badge"> · your vote</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="link-button"
+                          onClick={() => voteCaptain(n.userId)}
+                          disabled={busy}
+                        >
+                          {' '}
+                          Vote
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
         </section>
       )}
