@@ -83,6 +83,8 @@ export interface QueueEntry {
 export interface QueueMe {
   entry: QueueEntry | null;
   cooldownUntil: string | null;
+  // Set once the user has been matched into a team (redirect target).
+  matchedTeamId: string | null;
 }
 
 // Returned by GET /api/queue/status.

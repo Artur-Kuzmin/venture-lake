@@ -5,6 +5,7 @@ import { sendData, ApiError } from '../lib/response.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireProfile } from '../middleware/requireProfile.js';
+import { tryMatchQueue } from '../services/matchmakingEngine.js';
 
 // Party queue (Foundation Bible, Phase 2.2). A party is a 1–5 person group that
 // enters the global queue as ONE unit. The party id doubles as the invite code.
@@ -227,6 +228,9 @@ router.post(
         data: memberIds.map((id) => ({ userId: id, partyId: party.id, status: 'QUEUED' as const })),
       }),
     ]);
+
+    // Attempt automatic matchmaking now that the party is queued (Phase 3.2).
+    await tryMatchQueue();
 
     const updated = await loadParty(party.id);
     sendData(res, serialize(updated!, userId));

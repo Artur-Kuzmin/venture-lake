@@ -5,11 +5,12 @@ import { sendData, ApiError } from '../lib/response.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireProfile } from '../middleware/requireProfile.js';
+import { tryMatchQueue } from '../services/matchmakingEngine.js';
 
 // Global founder queue, solo (Foundation Bible, Section 5 / Phase 2.1).
 // The queue is global, not session-specific. A completed founder profile is
-// required (enforced by requireProfile). Automatic matchmaking is wired up in
-// Phase 3 — this phase only manages join/leave/state.
+// required (enforced by requireProfile). Joining triggers automatic matchmaking
+// (Phase 3.2); a matched user is surfaced via matchedTeamId.
 const router = Router();
 router.use(requireAuth, requireProfile);
 
@@ -19,6 +20,20 @@ function findActiveEntry(userId: string) {
     where: { userId, status: 'QUEUED' },
     orderBy: { queuedAt: 'desc' },
   });
+}
+
+// The user's current active team (matched and not yet disbanded/failed/published).
+async function findActiveTeamId(userId: string): Promise<string | null> {
+  const membership = await prisma.teamMember.findFirst({
+    where: {
+      userId,
+      leftAt: null,
+      team: { status: { notIn: ['DISBANDED', 'FAILED', 'PUBLISHED'] } },
+    },
+    orderBy: { joinedAt: 'desc' },
+    select: { teamId: true },
+  });
+  return membership?.teamId ?? null;
 }
 
 // The user's active cooldown expiry (in the future), if any.
@@ -47,15 +62,18 @@ router.post(
     }
 
     const existing = await findActiveEntry(userId);
-    if (existing) {
-      sendData(res, existing);
-      return;
+    if (!existing) {
+      await prisma.queueEntry.create({ data: { userId, status: 'QUEUED' } });
     }
 
-    const entry = await prisma.queueEntry.create({
-      data: { userId, status: 'QUEUED' },
-    });
-    sendData(res, entry, 201);
+    // Attempt automatic matchmaking now that the user is queued.
+    await tryMatchQueue();
+
+    const [entry, matchedTeamId] = await Promise.all([
+      findActiveEntry(userId),
+      findActiveTeamId(userId),
+    ]);
+    sendData(res, { entry, matchedTeamId });
   })
 );
 
@@ -83,11 +101,12 @@ router.get(
   '/me',
   asyncHandler(async (req, res) => {
     const userId = req.user!.userId;
-    const [entry, cooldownUntil] = await Promise.all([
+    const [entry, cooldownUntil, matchedTeamId] = await Promise.all([
       findActiveEntry(userId),
       findActiveCooldown(userId),
+      findActiveTeamId(userId),
     ]);
-    sendData(res, { entry, cooldownUntil });
+    sendData(res, { entry, cooldownUntil, matchedTeamId });
   })
 );
 

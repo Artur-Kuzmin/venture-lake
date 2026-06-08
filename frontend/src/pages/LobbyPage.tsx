@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../lib/apiClient';
 import { PartyPanel } from '../components/PartyPanel';
 import type { Party, QueueMe, QueuePoolStats } from '../types';
 
 export default function LobbyPage() {
+  const navigate = useNavigate();
   const [me, setMe] = useState<QueueMe | null>(null);
   const [stats, setStats] = useState<QueuePoolStats | null>(null);
   const [party, setParty] = useState<Party | null>(null);
@@ -38,6 +40,13 @@ export default function LobbyPage() {
       clearInterval(interval);
     };
   }, [load]);
+
+  // Once matched, send the user to their team lobby.
+  useEffect(() => {
+    if (me?.matchedTeamId) {
+      navigate(`/team/${me.matchedTeamId}`);
+    }
+  }, [me?.matchedTeamId, navigate]);
 
   async function handleJoin() {
     setError(null);
