@@ -84,12 +84,22 @@ async function buildTeamDetail(team: LoadedTeam, currentUserId: string) {
     prisma.missionSubmission.findFirst({
       where: { teamId: team.id },
       orderBy: { submittedAt: 'desc' },
-      include: { submittedBy: { select: { displayName: true } } },
+      include: {
+        submittedBy: { select: { displayName: true } },
+        reviewAssignments: { select: { status: true } },
+      },
     }),
   ]);
 
   const deliverables = (mission?.deliverables ?? []) as { title: string; description: string }[];
   const subFiles = (submission?.files ?? null) as { links?: string[]; notes?: string | null } | null;
+  // A first review timed out and the submission is back in the queue, unclaimed.
+  const reviewDelayed = Boolean(
+    submission &&
+      submission.status === 'SUBMITTED' &&
+      submission.reviewAssignments.some((a) => a.status === 'EXPIRED') &&
+      !submission.reviewAssignments.some((a) => a.status === 'ASSIGNED' || a.status === 'ACCEPTED')
+  );
 
   return {
     ...serializeTeam(team, currentUserId),
@@ -107,6 +117,7 @@ async function buildTeamDetail(team: LoadedTeam, currentUserId: string) {
           status: submission.status,
           submittedByName: submission.submittedBy.displayName,
           submittedAt: submission.submittedAt,
+          reviewDelayed,
         }
       : null,
     mission: mission

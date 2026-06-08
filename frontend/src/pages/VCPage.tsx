@@ -146,6 +146,8 @@ export default function VCPage() {
     );
   }
 
+  const cooldownUntil = vc.reviewCooldownUntil ? new Date(vc.reviewCooldownUntil) : null;
+  const onCooldown = Boolean(cooldownUntil && cooldownUntil.getTime() > now);
   const deadlineMs = assignment?.deadlineAt ? new Date(assignment.deadlineAt).getTime() : null;
   const expired = deadlineMs ? deadlineMs <= now : false;
   const allValid =
@@ -160,16 +162,26 @@ export default function VCPage() {
       <h1>VC Reviewer</h1>
 
       {!assignment ? (
-        <div className="queue-state">
-          <p>
-            <strong>Reviewer mode.</strong> Enter the queue to receive one anonymized submission.
-          </p>
-          <button type="button" onClick={enterQueue} disabled={busy}>
-            {busy ? 'Finding…' : 'Enter review queue'}
-          </button>
-          {info && <p className="placeholder">{info}</p>}
-          {error && <p className="form-error">{error}</p>}
-        </div>
+        onCooldown ? (
+          <div className="queue-state">
+            <p>⏳ You're on a review cooldown.</p>
+            <p className="placeholder">
+              You can re-enter the review queue after{' '}
+              <strong>{cooldownUntil!.toLocaleString()}</strong>.
+            </p>
+          </div>
+        ) : (
+          <div className="queue-state">
+            <p>
+              <strong>Reviewer mode.</strong> Enter the queue to receive one anonymized submission.
+            </p>
+            <button type="button" onClick={enterQueue} disabled={busy}>
+              {busy ? 'Finding…' : 'Enter review queue'}
+            </button>
+            {info && <p className="placeholder">{info}</p>}
+            {error && <p className="form-error">{error}</p>}
+          </div>
+        )
       ) : (
         <>
           <div className="queue-state">

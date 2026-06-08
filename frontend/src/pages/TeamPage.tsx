@@ -588,7 +588,10 @@ export default function TeamPage() {
 
       {team.status === 'SUBMITTED' && team.submission && (
         <section className="queue-state">
-          <h2>Submitted — awaiting VC review</h2>
+          <h2>{team.submission.reviewDelayed ? 'Review delayed' : 'Submitted — awaiting VC review'}</h2>
+          {team.submission.reviewDelayed && (
+            <p className="form-error">Review delayed — reassigned to the queue.</p>
+          )}
           <p className="placeholder">Submitted by {team.submission.submittedByName}.</p>
           <p>
             <strong>Summary:</strong> {team.submission.summary}

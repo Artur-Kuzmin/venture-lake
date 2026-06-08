@@ -192,6 +192,7 @@ export interface SubmissionView {
   status: 'SUBMITTED' | 'UNDER_REVIEW' | 'FINAL';
   submittedByName: string;
   submittedAt: string;
+  reviewDelayed: boolean;
 }
 
 // Returned by GET /api/teams/:id.

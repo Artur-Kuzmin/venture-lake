@@ -6,6 +6,7 @@ import { prisma } from '../lib/prisma.js';
 import { sendData, ApiError } from '../lib/response.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { expireOverdueReviewAssignments } from '../services/reviewExpiry.js';
 
 // VC reviewer routes (Foundation Bible, Phase 7). A user can be both Founder and
 // VC; VC mode requires admin approval. VC status is independent of a founder
@@ -78,13 +79,29 @@ router.get(
   })
 );
 
+// POST /api/vc/expire-review-assignments — dev/admin trigger to expire VC review
+// assignments past their 6h deadline (also runs on an interval; Phase 7.4).
+router.post(
+  '/expire-review-assignments',
+  asyncHandler(async (_req, res) => {
+    sendData(res, await expireOverdueReviewAssignments());
+  })
+);
+
 // POST /api/vc/queue/enter — assign ONE available anonymized submission (or
 // return the VC's current active assignment if they already have one).
 router.post(
   '/queue/enter',
   asyncHandler(async (req, res) => {
     const userId = req.user!.userId;
-    await assertApprovedVc(userId);
+    const vc = await assertApprovedVc(userId);
+    if (vc.reviewCooldownUntil && vc.reviewCooldownUntil > new Date()) {
+      throw new ApiError(
+        403,
+        'REVIEW_COOLDOWN',
+        `You are on a review cooldown until ${vc.reviewCooldownUntil.toISOString()}.`
+      );
+    }
 
     const existing = await findActiveAssignment(userId);
     if (existing) {
