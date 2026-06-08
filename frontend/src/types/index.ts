@@ -119,6 +119,29 @@ export interface TeamMemberView {
   joinedAt: string;
 }
 
+export type IdeaVoteValue = 'YES' | 'NO';
+export type MissionIdeaStatus = 'PROPOSED' | 'ACCEPTED' | 'REJECTED';
+
+export interface IdeaVoteView {
+  userId: string;
+  displayName: string;
+  vote: IdeaVoteValue;
+  rejectReason: string | null;
+  feedbackNote: string | null;
+}
+
+export interface MissionIdeaView {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  reasoning: string;
+  status: MissionIdeaStatus;
+  generationNumber: number;
+  createdAt: string;
+  votes: IdeaVoteView[];
+}
+
 // Returned by GET /api/teams/:id.
 export interface TeamDetail {
   id: string;
@@ -129,6 +152,8 @@ export interface TeamDetail {
   missionDeadlineAt: string | null;
   currentUserId: string;
   members: TeamMemberView[];
+  currentIdea: MissionIdeaView | null;
+  rejectedIdeaCount: number;
 }
 
 export interface TeamMessageView {
