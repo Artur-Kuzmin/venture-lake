@@ -101,9 +101,45 @@ async function buildTeamDetail(team: LoadedTeam, currentUserId: string) {
       !submission.reviewAssignments.some((a) => a.status === 'ASSIGNED' || a.status === 'ACCEPTED')
   );
 
+  // Completed VC reviews are shown privately to the team (identity + scores +
+  // feedback). The appeal window runs 6h from the first review (Phase 8.1).
+  const reviews = submission
+    ? await prisma.vCReview.findMany({
+        where: { submissionId: submission.id },
+        orderBy: { createdAt: 'asc' },
+        include: { vcUser: { select: { displayName: true } }, categories: true },
+      })
+    : [];
+  const firstReview = reviews.find((r) => !r.isAppealReview);
+  const appealWindowExpiresAt =
+    team.status === 'APPEAL_WINDOW' && firstReview
+      ? new Date(firstReview.createdAt.getTime() + 6 * 3600 * 1000)
+      : null;
+  const FINAL_STATUSES = ['REVIEW_FINAL', 'CONTINUATION_VOTING', 'CONTINUING', 'PIVOTING', 'PUBLISHED'];
+  const reviewFinal = FINAL_STATUSES.includes(team.status);
+  const finalScore =
+    reviewFinal && reviews.length
+      ? reviews.reduce((s, r) => s + r.overallScore, 0) / reviews.length
+      : null;
+
   return {
     ...serializeTeam(team, currentUserId),
     rejectedIdeaCount,
+    reviews: reviews.map((r) => ({
+      vcName: r.vcUser.displayName,
+      isAppealReview: r.isAppealReview,
+      overallScore: r.overallScore,
+      status: r.status,
+      createdAt: r.createdAt,
+      categories: r.categories.map((c) => ({
+        category: c.category,
+        score: c.score,
+        feedback: c.feedback,
+      })),
+    })),
+    appealWindowExpiresAt,
+    reviewFinal,
+    finalScore,
     submission: submission
       ? {
           id: submission.id,

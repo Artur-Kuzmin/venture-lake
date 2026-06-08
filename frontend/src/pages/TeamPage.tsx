@@ -645,6 +645,50 @@ export default function TeamPage() {
         </section>
       )}
 
+      {team.reviews.length > 0 && (
+        <section className="queue-state">
+          <h2>VC review</h2>
+          {team.status === 'APPEAL_WINDOW' && team.appealWindowExpiresAt && (
+            <p className="timer">
+              ⏳ Appeal window closes in{' '}
+              {formatRemaining(new Date(team.appealWindowExpiresAt).getTime() - now)}
+            </p>
+          )}
+
+          {team.reviews.map((r, i) => (
+            <div key={i} className="review-block">
+              <h3>
+                {r.isAppealReview ? 'Appeal review' : 'Review'} by {r.vcName} —{' '}
+                {Math.round(r.overallScore)}/100
+              </h3>
+              <ul className="party-members">
+                {r.categories.map((c, j) => (
+                  <li key={j}>
+                    <strong>{c.category}:</strong> {c.score}/10 — {c.feedback}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+
+          {team.reviewFinal ? (
+            <p>
+              <strong>
+                Final score: {team.finalScore != null ? Math.round(team.finalScore) : '—'}/100
+              </strong>{' '}
+              (locked)
+            </p>
+          ) : (
+            <>
+              <p className="placeholder">Score is not final until the appeal window closes.</p>
+              <p className="placeholder">
+                🔒 The continuation vote is locked until the review is final.
+              </p>
+            </>
+          )}
+        </section>
+      )}
+
       <section className="queue-state chat">
         <h2>Chat</h2>
         <div className="chat-log">

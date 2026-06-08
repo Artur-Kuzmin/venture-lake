@@ -298,8 +298,8 @@ router.post(
         where: { id: assignment.id },
         data: { status: 'COMPLETED', completedAt: new Date() },
       });
-      // First review: leave the queue and mark the team under review. The
-      // appeal-window transition is handled in Phase 8.1.
+      // First review: leave the queue and open the 6h appeal window for the
+      // team (Phase 8.1). The window closes -> REVIEW_FINAL in Phase 8.2.
       if (!assignment.isAppealReview) {
         await tx.missionSubmission.update({
           where: { id: assignment.submissionId },
@@ -307,7 +307,7 @@ router.post(
         });
         await tx.team.update({
           where: { id: assignment.submission.teamId },
-          data: { status: 'UNDER_REVIEW' },
+          data: { status: 'APPEAL_WINDOW' },
         });
       }
       return created;

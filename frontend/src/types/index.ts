@@ -195,6 +195,22 @@ export interface SubmissionView {
   reviewDelayed: boolean;
 }
 
+export interface TeamReviewCategory {
+  category: string;
+  score: number;
+  feedback: string;
+}
+
+// A completed VC review shown privately to the team.
+export interface TeamReviewView {
+  vcName: string;
+  isAppealReview: boolean;
+  overallScore: number;
+  status: 'VALID' | 'INVALID';
+  createdAt: string;
+  categories: TeamReviewCategory[];
+}
+
 // Returned by GET /api/teams/:id.
 export interface TeamDetail {
   id: string;
@@ -209,6 +225,10 @@ export interface TeamDetail {
   rejectedIdeaCount: number;
   mission: MissionDraft | null;
   submission: SubmissionView | null;
+  reviews: TeamReviewView[];
+  appealWindowExpiresAt: string | null;
+  reviewFinal: boolean;
+  finalScore: number | null;
 }
 
 export interface TeamMessageView {
