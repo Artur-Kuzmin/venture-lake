@@ -128,15 +128,18 @@ router.post(
     const candidate = await prisma.missionSubmission.findFirst({
       where,
       orderBy: { submittedAt: 'asc' },
-      select: { id: true },
+      select: { id: true, appeals: { where: { status: 'APPROVED' }, select: { id: true }, take: 1 } },
     });
     if (!candidate) {
       sendData(res, null);
       return;
     }
 
+    // A submission re-queued by an approved appeal gets an appeal review (its
+    // score is final; Phase 8.2). The prior VC is already excluded above.
+    const isAppealReview = candidate.appeals.length > 0;
     const created = await prisma.vCReviewAssignment.create({
-      data: { submissionId: candidate.id, vcUserId: userId, status: 'ASSIGNED', isAppealReview: false },
+      data: { submissionId: candidate.id, vcUserId: userId, status: 'ASSIGNED', isAppealReview },
       include: { submission: { include: { mission: true } } },
     });
     sendData(res, buildAssignmentView(created), 201);
@@ -308,6 +311,21 @@ router.post(
         await tx.team.update({
           where: { id: assignment.submission.teamId },
           data: { status: 'APPEAL_WINDOW' },
+        });
+      } else {
+        // Appeal review (Phase 8.2): this score is final — a score can be
+        // appealed only once, so no second appeal window opens.
+        await tx.reviewAppeal.updateMany({
+          where: { submissionId: assignment.submissionId, status: 'APPROVED' },
+          data: { status: 'COMPLETED' },
+        });
+        await tx.missionSubmission.update({
+          where: { id: assignment.submissionId },
+          data: { status: 'FINAL' },
+        });
+        await tx.team.update({
+          where: { id: assignment.submission.teamId },
+          data: { status: 'REVIEW_FINAL' },
         });
       }
       return created;

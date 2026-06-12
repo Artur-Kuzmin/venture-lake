@@ -6,6 +6,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { sendData } from './lib/response.js';
 import { expireOverdueMissions } from './services/missionExpiry.js';
 import { expireOverdueReviewAssignments } from './services/reviewExpiry.js';
+import { expireAppealWindows } from './services/appealExpiry.js';
 
 import authRoutes from './routes/auth.js';
 import profileRoutes from './routes/profile.js';
@@ -16,6 +17,7 @@ import teamsRoutes from './routes/teams.js';
 import missionIdeasRoutes from './routes/missionIdeas.js';
 import missionsRoutes from './routes/missions.js';
 import vcRoutes from './routes/vc.js';
+import appealsRoutes from './routes/appeals.js';
 import showcaseRoutes from './routes/showcase.js';
 import adminRoutes from './routes/admin.js';
 
@@ -40,6 +42,8 @@ app.use('/api/teams', teamsRoutes);
 app.use('/api/mission-ideas', missionIdeasRoutes);
 app.use('/api/missions', missionsRoutes);
 app.use('/api/vc', vcRoutes);
+// Review appeals: /api/submissions/:id/appeal/start and /api/appeals/:id/vote.
+app.use('/api', appealsRoutes);
 app.use('/api/showcase', showcaseRoutes);
 app.use('/api/admin', adminRoutes);
 
@@ -51,11 +55,13 @@ app.listen(port, () => {
   console.log(`[venturelake-backend] listening on http://localhost:${port}`);
 });
 
-// Background jobs: auto-fail overdue missions and expire overdue VC reviews.
+// Background jobs: auto-fail overdue missions, expire overdue VC reviews, and
+// finalize reviews whose appeal window or appeal vote has lapsed.
 const EXPIRY_INTERVAL_MS = 5 * 60 * 1000;
 setInterval(() => {
   expireOverdueMissions().catch((err) => console.error('[missionExpiry]', err));
   expireOverdueReviewAssignments().catch((err) => console.error('[reviewExpiry]', err));
+  expireAppealWindows().catch((err) => console.error('[appealExpiry]', err));
 }, EXPIRY_INTERVAL_MS);
 
 export default app;
