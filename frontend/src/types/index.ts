@@ -211,6 +211,17 @@ export interface TeamReviewView {
   categories: TeamReviewCategory[];
 }
 
+// One-time appeal state for the current submission (null if none started).
+export interface TeamAppealState {
+  id: string;
+  status: 'OPEN' | 'APPROVED' | 'REJECTED' | 'COMPLETED';
+  expiresAt: string;
+  yesCount: number;
+  noCount: number;
+  majorityNeeded: number;
+  myVote: 'YES' | 'NO' | null;
+}
+
 // Returned by GET /api/teams/:id.
 export interface TeamDetail {
   id: string;
@@ -227,6 +238,7 @@ export interface TeamDetail {
   submission: SubmissionView | null;
   reviews: TeamReviewView[];
   appealWindowExpiresAt: string | null;
+  appeal: TeamAppealState | null;
   reviewFinal: boolean;
   finalScore: number | null;
 }

@@ -254,6 +254,17 @@ export default function TeamPage() {
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setPublishForm((p) => ({ ...p, [key]: e.target.value }));
 
+  const startAppeal = () =>
+    run(
+      () => api.post(`/api/submissions/${team!.submission!.id}/appeal/start`),
+      'Could not start the appeal.'
+    );
+  const voteAppeal = (vote: 'YES' | 'NO') =>
+    run(
+      () => api.post(`/api/appeals/${team!.appeal!.id}/vote`, { vote }),
+      'Could not vote on the appeal.'
+    );
+
   const startContinuationVote = () =>
     run(() => api.post(`/api/teams/${teamId}/continuation/start`), 'Could not start the vote.');
   const voteContinuation = (choice: ContinuationChoice) =>
@@ -343,6 +354,8 @@ export default function TeamPage() {
   const deliverablesAssigned = mission
     ? mission.deliverables.length > 0 && mission.assignments.length === mission.deliverables.length
     : false;
+  const appeal = team.appeal;
+  const appealExpired = appeal ? new Date(appeal.expiresAt).getTime() <= now : false;
 
   return (
     <div className="page">
@@ -773,6 +786,59 @@ export default function TeamPage() {
               ⏳ Appeal window closes in{' '}
               {formatRemaining(new Date(team.appealWindowExpiresAt).getTime() - now)}
             </p>
+          )}
+
+          {team.status === 'APPEAL_WINDOW' && !appeal && team.submission && (
+            <div>
+              <button type="button" onClick={startAppeal} disabled={busy}>
+                Start appeal
+              </button>
+              <p className="placeholder">
+                A score can be appealed once. The team then has 6 hours to approve the appeal by
+                majority vote; if approved, a different VC reviews the submission blind.
+              </p>
+            </div>
+          )}
+
+          {appeal && appeal.status === 'OPEN' && !appealExpired && (
+            <div>
+              <p>
+                <strong>Appeal vote open</strong>
+              </p>
+              <p className="timer">
+                ⏳ {formatRemaining(new Date(appeal.expiresAt).getTime() - now)} to reach a
+                majority
+              </p>
+              <p>
+                YES: {appeal.yesCount} · NO: {appeal.noCount} · Needed: {appeal.majorityNeeded}
+              </p>
+              <div className="vote-actions">
+                <button
+                  type="button"
+                  onClick={() => voteAppeal('YES')}
+                  disabled={busy || appeal.myVote === 'YES'}
+                >
+                  Vote YES{appeal.myVote === 'YES' ? ' ✓' : ''}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => voteAppeal('NO')}
+                  disabled={busy || appeal.myVote === 'NO'}
+                  className="link-button"
+                >
+                  Vote NO{appeal.myVote === 'NO' ? ' ✓' : ''}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {appeal?.status === 'APPROVED' && (
+            <p>Appeal approved. The submission has been sent to a new reviewer.</p>
+          )}
+
+          {appeal &&
+            (appeal.status === 'REJECTED' || (appeal.status === 'OPEN' && appealExpired)) && (
+            <p>Appeal closed. The first review is final.</p>
           )}
 
           {team.reviews.map((r, i) => (

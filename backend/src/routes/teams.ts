@@ -120,6 +120,27 @@ async function buildTeamDetail(team: LoadedTeam, currentUserId: string) {
     team.status === 'APPEAL_WINDOW' && firstReview
       ? new Date(firstReview.createdAt.getTime() + 6 * 3600 * 1000)
       : null;
+
+  // One-time appeal state for the current submission (Phase 8.2), so the team
+  // page can render and reload the appeal UI. At most one appeal exists.
+  const appealRecord = submission
+    ? await prisma.reviewAppeal.findFirst({
+        where: { submissionId: submission.id },
+        orderBy: { createdAt: 'desc' },
+        include: { votes: true },
+      })
+    : null;
+  const appeal = appealRecord
+    ? {
+        id: appealRecord.id,
+        status: appealRecord.status,
+        expiresAt: appealRecord.expiresAt,
+        yesCount: appealRecord.votes.filter((v) => v.vote === 'YES').length,
+        noCount: appealRecord.votes.filter((v) => v.vote === 'NO').length,
+        majorityNeeded: Math.floor(team.members.length / 2) + 1,
+        myVote: appealRecord.votes.find((v) => v.userId === currentUserId)?.vote ?? null,
+      }
+    : null;
   const FINAL_STATUSES = ['REVIEW_FINAL', 'CONTINUATION_VOTING', 'CONTINUING', 'PIVOTING', 'PUBLISHED', 'DISBANDED'];
   const reviewFinal = FINAL_STATUSES.includes(team.status);
   const finalScore =
@@ -143,6 +164,7 @@ async function buildTeamDetail(team: LoadedTeam, currentUserId: string) {
       })),
     })),
     appealWindowExpiresAt,
+    appeal,
     reviewFinal,
     finalScore,
     submission: submission
