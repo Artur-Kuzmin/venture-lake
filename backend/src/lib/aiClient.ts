@@ -45,6 +45,13 @@ export interface GenerateDeliverablesInput {
   profiles: ProfileInputForAi[];
 }
 
+export interface GenerateFollowUpMissionInput {
+  originalMission: { title: string; brief: string; category: string };
+  submissionSummary: string;
+  finalScore: number | null;
+  profiles: ProfileInputForAi[];
+}
+
 const AI_API_KEY = process.env.AI_API_KEY ?? '';
 const AI_MODEL = process.env.AI_MODEL ?? 'claude-opus-4-8';
 
@@ -300,6 +307,36 @@ export const aiClient = {
       input.feedback,
       input.previousIdeas.map((p) => p.title)
     );
+  },
+
+  // Longer follow-up mission for a team that voted CONTINUE (Phase 9). Must
+  // build on the original project, never propose a fresh idea.
+  async generateFollowUpMission(input: GenerateFollowUpMissionInput): Promise<MissionIdeaResult> {
+    if (AI_API_KEY) {
+      const user =
+        `${summariseTeam(input.profiles)}\n\n` +
+        `The team completed a 72-hour intro mission: "${input.originalMission.title}" — ` +
+        `${input.originalMission.brief}\n` +
+        `Their submission summary: ${input.submissionSummary}\n` +
+        (input.finalScore != null
+          ? `Final VC review score: ${Math.round(input.finalScore)}/100.\n`
+          : '') +
+        '\nPropose ONE follow-up mission for the SAME project that deepens it over 1-2 weeks ' +
+        '(e.g. first real users, a working MVP slice, early traction). It must build directly ' +
+        'on the original mission and submission — do NOT propose a new idea.';
+      return callAnthropic(STRICT_JSON_SYSTEM, user);
+    }
+    return {
+      title: `Grow "${input.originalMission.title}" to first users`,
+      description:
+        'Build on the 72-hour result: harden what was submitted, close its weakest gaps, and put ' +
+        'the project in front of its first real users with a simple feedback loop and a concrete ' +
+        'usage goal for the week.',
+      category: input.originalMission.category,
+      reasoning:
+        'The team voted to continue the same idea, so the follow-up mission extends the original ' +
+        'project toward real usage instead of starting a fresh concept.',
+    };
   },
 
   async generateDeliverables(input: GenerateDeliverablesInput): Promise<DeliverableResult[]> {

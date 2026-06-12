@@ -231,6 +231,26 @@ export interface TeamDetail {
   finalScore: number | null;
 }
 
+export type ContinuationChoice = 'CONTINUE' | 'PIVOT' | 'PUBLISH_END' | 'DISBAND_PRIVATE';
+
+export interface ContinuationVoteView {
+  userId: string;
+  displayName: string;
+  choice: ContinuationChoice;
+}
+
+// Returned by the /api/teams/:id/continuation* endpoints. The vote endpoint
+// additionally returns `result` (the winning choice once a majority is reached).
+export interface ContinuationState {
+  teamStatus: TeamStatus;
+  memberCount: number;
+  majorityNeeded: number;
+  tallies: { choice: ContinuationChoice; votes: number }[];
+  votes: ContinuationVoteView[];
+  myChoice: ContinuationChoice | null;
+  votesCast: number;
+}
+
 export interface TeamMessageView {
   id: string;
   userId: string;

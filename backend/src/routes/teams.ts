@@ -115,7 +115,7 @@ async function buildTeamDetail(team: LoadedTeam, currentUserId: string) {
     team.status === 'APPEAL_WINDOW' && firstReview
       ? new Date(firstReview.createdAt.getTime() + 6 * 3600 * 1000)
       : null;
-  const FINAL_STATUSES = ['REVIEW_FINAL', 'CONTINUATION_VOTING', 'CONTINUING', 'PIVOTING', 'PUBLISHED'];
+  const FINAL_STATUSES = ['REVIEW_FINAL', 'CONTINUATION_VOTING', 'CONTINUING', 'PIVOTING', 'PUBLISHED', 'DISBANDED'];
   const reviewFinal = FINAL_STATUSES.includes(team.status);
   const finalScore =
     reviewFinal && reviews.length
@@ -277,6 +277,25 @@ router.post(
   asyncHandler(async (req, res) => {
     const userId = req.user!.userId;
     const team = await requireMember(req.params.id, userId);
+
+    // Post-review (Phase 9): an individual member may leave without penalty —
+    // no cooldown, no replacement queue in the MVP. A departure can complete
+    // the continuation majority, so the vote is re-resolved.
+    if (team.status === 'REVIEW_FINAL' || team.status === 'CONTINUATION_VOTING') {
+      const me = team.members.find((m) => m.userId === userId)!;
+      await prisma.teamMember.update({ where: { id: me.id }, data: { leftAt: new Date() } });
+      if (team.members.length - 1 === 0) {
+        await prisma.team.update({ where: { id: team.id }, data: { status: 'DISBANDED' } });
+        sendData(res, { left: true, dissolved: true, teamStatus: 'DISBANDED' });
+        return;
+      }
+      if (team.status === 'CONTINUATION_VOTING') {
+        await resolveContinuationVote((await loadTeam(team.id))!);
+      }
+      sendData(res, { left: true, dissolved: false, teamStatus: (await loadTeam(team.id))!.status });
+      return;
+    }
+
     if (team.status !== 'LOBBY') {
       throw new ApiError(409, 'MISSION_STARTED', 'You cannot leave after the mission has started.');
     }
@@ -639,6 +658,210 @@ router.post(
 
     const updated = await loadTeam(team.id);
     sendData(res, await buildTeamDetail(updated!, userId));
+  })
+);
+
+// ---- Continuation vote (Phase 9) -----------------------------------------
+
+const CONTINUATION_CHOICES = ['CONTINUE', 'PIVOT', 'PUBLISH_END', 'DISBAND_PRIVATE'] as const;
+type ContinuationChoice = (typeof CONTINUATION_CHOICES)[number];
+const FOLLOW_UP_DURATION_HOURS = 168;
+
+// Vote state among ACTIVE members only (votes by members who left don't count).
+async function buildContinuationState(team: LoadedTeam, currentUserId: string) {
+  const votes = await prisma.continuationVote.findMany({ where: { teamId: team.id } });
+  const nameById = new Map(team.members.map((m) => [m.userId, m.user.displayName]));
+  const activeVotes = votes.filter((v) => nameById.has(v.userId));
+  const memberCount = team.members.length;
+  return {
+    teamStatus: team.status,
+    memberCount,
+    majorityNeeded: Math.floor(memberCount / 2) + 1,
+    tallies: CONTINUATION_CHOICES.map((choice) => ({
+      choice,
+      votes: activeVotes.filter((v) => v.choice === choice).length,
+    })),
+    votes: activeVotes.map((v) => ({
+      userId: v.userId,
+      displayName: nameById.get(v.userId)!,
+      choice: v.choice,
+    })),
+    myChoice: activeVotes.find((v) => v.userId === currentUserId)?.choice ?? null,
+    votesCast: activeVotes.length,
+  };
+}
+
+// CONTINUE outcome: AI generates a LONGER follow-up mission tied to the
+// original project (idea is pre-accepted — the team already voted to continue).
+async function startFollowUpMission(team: LoadedTeam) {
+  const [mission, submission, profiles, ideaCount] = await Promise.all([
+    prisma.mission.findFirst({
+      where: { teamId: team.id },
+      orderBy: { startedAt: 'desc' },
+      include: { missionIdea: true },
+    }),
+    prisma.missionSubmission.findFirst({
+      where: { teamId: team.id },
+      orderBy: { submittedAt: 'desc' },
+      include: { reviews: true },
+    }),
+    prisma.founderProfile.findMany({
+      where: { userId: { in: team.members.map((m) => m.userId) } },
+    }),
+    prisma.missionIdea.count({ where: { teamId: team.id } }),
+  ]);
+  if (!mission || !submission) {
+    throw new ApiError(409, 'NO_COMPLETED_MISSION', 'There is no completed mission to continue.');
+  }
+
+  const finalScore = submission.reviews.length
+    ? submission.reviews.reduce((s, r) => s + r.overallScore, 0) / submission.reviews.length
+    : null;
+  const followUp = await aiClient.generateFollowUpMission({
+    originalMission: {
+      title: mission.title,
+      brief: mission.brief,
+      category: mission.missionIdea.category,
+    },
+    submissionSummary: submission.summary,
+    finalScore,
+    profiles,
+  });
+  const deliverables = await aiClient.generateDeliverables({
+    mission: { title: followUp.title, brief: followUp.description },
+    profiles,
+  });
+
+  const now = new Date();
+  const deadlineAt = new Date(now.getTime() + FOLLOW_UP_DURATION_HOURS * 3600 * 1000);
+  await prisma.$transaction(async (tx) => {
+    const idea = await tx.missionIdea.create({
+      data: { teamId: team.id, ...followUp, status: 'ACCEPTED', generationNumber: ideaCount + 1 },
+    });
+    await tx.mission.create({
+      data: {
+        teamId: team.id,
+        missionIdeaId: idea.id,
+        title: followUp.title,
+        brief: followUp.description,
+        durationHours: FOLLOW_UP_DURATION_HOURS,
+        deliverables: deliverables as unknown as Prisma.InputJsonValue,
+        status: 'ACTIVE',
+        startedAt: now,
+        deadlineAt,
+      },
+    });
+    await tx.team.update({
+      where: { id: team.id },
+      data: { status: 'CONTINUING', missionStartedAt: now, missionDeadlineAt: deadlineAt },
+    });
+  });
+}
+
+// Tallies active members' votes; if a choice has a simple majority, applies the
+// outcome and returns the winning choice, otherwise returns null.
+async function resolveContinuationVote(team: LoadedTeam): Promise<ContinuationChoice | null> {
+  const votes = await prisma.continuationVote.findMany({ where: { teamId: team.id } });
+  const activeIds = new Set(team.members.map((m) => m.userId));
+  const majorityNeeded = Math.floor(team.members.length / 2) + 1;
+  const counts = new Map<string, number>();
+  for (const v of votes) {
+    if (activeIds.has(v.userId)) counts.set(v.choice, (counts.get(v.choice) ?? 0) + 1);
+  }
+  const winner = CONTINUATION_CHOICES.find((c) => (counts.get(c) ?? 0) >= majorityNeeded) ?? null;
+  if (!winner) return null;
+
+  switch (winner) {
+    case 'CONTINUE':
+      await startFollowUpMission(team);
+      break;
+    case 'PIVOT':
+      // Full reset within the same team: back to the lobby with a clean slate
+      // (captain, captain votes, ready flags, continuation votes). Mission and
+      // review history is kept.
+      await prisma.$transaction([
+        prisma.captainNomination.deleteMany({ where: { teamId: team.id } }),
+        prisma.captainVote.deleteMany({ where: { teamId: team.id } }),
+        prisma.continuationVote.deleteMany({ where: { teamId: team.id } }),
+        prisma.teamMember.updateMany({
+          where: { teamId: team.id, leftAt: null },
+          data: { ready: false },
+        }),
+        prisma.team.update({
+          where: { id: team.id },
+          data: { status: 'LOBBY', captainId: null, missionStartedAt: null, missionDeadlineAt: null },
+        }),
+      ]);
+      break;
+    case 'PUBLISH_END':
+      // Showcase flow (Phase 10) opens for PUBLISHED teams.
+      await prisma.team.update({ where: { id: team.id }, data: { status: 'PUBLISHED' } });
+      break;
+    case 'DISBAND_PRIVATE':
+      // Session ends privately — nothing is published; members may requeue.
+      await prisma.team.update({ where: { id: team.id }, data: { status: 'DISBANDED' } });
+      break;
+  }
+  return winner;
+}
+
+// POST /api/teams/:id/continuation/start — any member opens the post-review
+// vote. Allowed ONLY once the review is final.
+router.post(
+  '/:id/continuation/start',
+  asyncHandler(async (req, res) => {
+    const userId = req.user!.userId;
+    const team = await requireMember(req.params.id, userId);
+    if (team.status !== 'REVIEW_FINAL') {
+      throw new ApiError(
+        409,
+        'REVIEW_NOT_FINAL',
+        'The continuation vote opens once the VC review is final.'
+      );
+    }
+    await prisma.$transaction([
+      // Defensive: clear any stale votes from an earlier round.
+      prisma.continuationVote.deleteMany({ where: { teamId: team.id } }),
+      prisma.team.update({ where: { id: team.id }, data: { status: 'CONTINUATION_VOTING' } }),
+    ]);
+    const updated = await loadTeam(team.id);
+    sendData(res, await buildContinuationState(updated!, userId), 201);
+  })
+);
+
+// GET /api/teams/:id/continuation — tallies, per-member votes, my choice.
+router.get(
+  '/:id/continuation',
+  asyncHandler(async (req, res) => {
+    const userId = req.user!.userId;
+    const team = await requireMember(req.params.id, userId);
+    sendData(res, await buildContinuationState(team, userId));
+  })
+);
+
+const continuationVoteSchema = z.object({ choice: z.enum(CONTINUATION_CHOICES) });
+
+// POST /api/teams/:id/continuation/vote — cast (or change) a choice; a simple
+// majority of active members decides the outcome.
+router.post(
+  '/:id/continuation/vote',
+  asyncHandler(async (req, res) => {
+    const userId = req.user!.userId;
+    const team = await requireMember(req.params.id, userId);
+    if (team.status !== 'CONTINUATION_VOTING') {
+      throw new ApiError(409, 'NOT_IN_CONTINUATION_VOTING', 'The team is not voting on continuation.');
+    }
+    const { choice } = continuationVoteSchema.parse(req.body);
+
+    await prisma.continuationVote.upsert({
+      where: { teamId_userId: { teamId: team.id, userId } },
+      create: { teamId: team.id, userId, choice },
+      update: { choice },
+    });
+
+    const result = await resolveContinuationVote(team);
+    const updated = await loadTeam(team.id);
+    sendData(res, { ...(await buildContinuationState(updated!, userId)), result });
   })
 );
 

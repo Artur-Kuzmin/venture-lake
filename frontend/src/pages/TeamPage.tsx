@@ -1,7 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../lib/apiClient';
-import type { CaptainVoteState, TeamDetail, TeamMessageView } from '../types';
+import type {
+  CaptainVoteState,
+  ContinuationChoice,
+  ContinuationState,
+  TeamDetail,
+  TeamMessageView,
+} from '../types';
+
+// Post-review continuation options (Phase 9).
+const CONTINUATION_OPTIONS: { choice: ContinuationChoice; label: string; hint: string }[] = [
+  {
+    choice: 'CONTINUE',
+    label: 'Continue same idea',
+    hint: 'AI generates a longer follow-up mission for this project.',
+  },
+  {
+    choice: 'PIVOT',
+    label: 'Pivot together',
+    hint: 'Full reset with the same team — back to the lobby.',
+  },
+  {
+    choice: 'PUBLISH_END',
+    label: 'Publish & end',
+    hint: 'End the session and open the public showcase flow.',
+  },
+  {
+    choice: 'DISBAND_PRIVATE',
+    label: 'Disband privately',
+    hint: 'End the session privately — nothing is published.',
+  },
+];
 
 // Controlled reject reasons (Foundation Bible, Section 5).
 const REJECT_REASONS = [
@@ -33,6 +63,7 @@ export default function TeamPage() {
   const navigate = useNavigate();
   const [team, setTeam] = useState<TeamDetail | null>(null);
   const [captainVote, setCaptainVote] = useState<CaptainVoteState | null>(null);
+  const [continuation, setContinuation] = useState<ContinuationState | null>(null);
   const [messages, setMessages] = useState<TeamMessageView[]>([]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(true);
@@ -65,6 +96,11 @@ export default function TeamPage() {
       setCaptainVote(await api.get<CaptainVoteState>(`/api/teams/${teamId}/captain-vote`));
     } else {
       setCaptainVote(null);
+    }
+    if (teamRes.status === 'CONTINUATION_VOTING') {
+      setContinuation(await api.get<ContinuationState>(`/api/teams/${teamId}/continuation`));
+    } else {
+      setContinuation(null);
     }
   }, [teamId]);
 
@@ -177,6 +213,11 @@ export default function TeamPage() {
     (key: keyof typeof submitForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setSubmitForm((p) => ({ ...p, [key]: e.target.value }));
+
+  const startContinuationVote = () =>
+    run(() => api.post(`/api/teams/${teamId}/continuation/start`), 'Could not start the vote.');
+  const voteContinuation = (choice: ContinuationChoice) =>
+    run(() => api.post(`/api/teams/${teamId}/continuation/vote`, { choice }), 'Could not vote.');
 
   function voteYes(ideaId: string) {
     return run(() => api.post(`/api/mission-ideas/${ideaId}/vote`, { vote: 'YES' }), 'Could not vote.');
@@ -645,7 +686,10 @@ export default function TeamPage() {
         </section>
       )}
 
-      {team.reviews.length > 0 && (
+      {/* Hidden in pre-review stages so a pivoted team's fresh round doesn't
+          show the previous round's review. */}
+      {team.reviews.length > 0 &&
+        !['LOBBY', 'IDEA_VOTING', 'CAPTAIN_VOTING', 'MISSION_ACTIVE'].includes(team.status) && (
         <section className="queue-state">
           <h2>VC review</h2>
           {team.status === 'APPEAL_WINDOW' && team.appealWindowExpiresAt && (
@@ -672,12 +716,19 @@ export default function TeamPage() {
           ))}
 
           {team.reviewFinal ? (
-            <p>
-              <strong>
-                Final score: {team.finalScore != null ? Math.round(team.finalScore) : '—'}/100
-              </strong>{' '}
-              (locked)
-            </p>
+            <>
+              <p>
+                <strong>
+                  Final score: {team.finalScore != null ? Math.round(team.finalScore) : '—'}/100
+                </strong>{' '}
+                (locked)
+              </p>
+              {team.status === 'REVIEW_FINAL' && (
+                <button type="button" onClick={startContinuationVote} disabled={busy}>
+                  Start continuation vote
+                </button>
+              )}
+            </>
           ) : (
             <>
               <p className="placeholder">Score is not final until the appeal window closes.</p>
@@ -686,6 +737,99 @@ export default function TeamPage() {
               </p>
             </>
           )}
+        </section>
+      )}
+
+      {team.status === 'CONTINUATION_VOTING' && continuation && (
+        <section className="queue-state">
+          <h2>What's next? Team vote</h2>
+          <p className="placeholder">
+            Majority wins ({continuation.majorityNeeded} of {continuation.memberCount}). You can
+            change your vote until a majority is reached.
+          </p>
+          <ul className="party-members">
+            {CONTINUATION_OPTIONS.map((opt) => {
+              const tally = continuation.tallies.find((t) => t.choice === opt.choice)?.votes ?? 0;
+              const mine = continuation.myChoice === opt.choice;
+              return (
+                <li key={opt.choice}>
+                  <button
+                    type="button"
+                    onClick={() => voteContinuation(opt.choice)}
+                    disabled={busy || mine}
+                  >
+                    {opt.label}
+                  </button>{' '}
+                  — {tally} vote{tally === 1 ? '' : 's'}
+                  {mine && <span className="badge"> · your vote</span>}
+                  <div className="placeholder">{opt.hint}</div>
+                </li>
+              );
+            })}
+          </ul>
+          {continuation.votes.length > 0 && (
+            <p className="placeholder">
+              {continuation.votes
+                .map(
+                  (v) =>
+                    `${v.displayName}: ${
+                      CONTINUATION_OPTIONS.find((o) => o.choice === v.choice)?.label ?? v.choice
+                    }`
+                )
+                .join(' · ')}
+            </p>
+          )}
+        </section>
+      )}
+
+      {team.status === 'CONTINUING' && mission && (
+        <section className="queue-state mission-view">
+          <h2>Continuing — follow-up mission</h2>
+          {team.missionDeadlineAt && (
+            <p className="timer">
+              ⏳ {formatRemaining(new Date(team.missionDeadlineAt).getTime() - now)} remaining
+            </p>
+          )}
+          <h3>{mission.title}</h3>
+          <p>{mission.brief}</p>
+          <h3>Deliverables</h3>
+          <ul className="party-members">
+            {mission.deliverables.map((d, i) => (
+              <li key={i}>
+                <strong>{d.title}</strong> — {d.description}
+              </li>
+            ))}
+          </ul>
+          <p className="placeholder">
+            The team voted to continue the same idea — this longer mission builds on the original
+            project.
+          </p>
+        </section>
+      )}
+
+      {team.status === 'PUBLISHED' && (
+        <section className="queue-state">
+          <h2>Published 🎉</h2>
+          <p>
+            The team voted to publish and end the session. The public showcase flow opens from
+            here.
+          </p>
+          <button type="button" onClick={requeueIndividually} disabled={busy}>
+            {busy ? 'Requeuing…' : 'Requeue individually'}
+          </button>
+        </section>
+      )}
+
+      {team.status === 'DISBANDED' && (
+        <section className="queue-state">
+          <h2>Session ended</h2>
+          <p>
+            The team disbanded privately — nothing is published. No penalty; requeue whenever you
+            like.
+          </p>
+          <button type="button" onClick={requeueIndividually} disabled={busy}>
+            {busy ? 'Requeuing…' : 'Requeue individually'}
+          </button>
         </section>
       )}
 
@@ -718,9 +862,9 @@ export default function TeamPage() {
 
       {error && <p className="form-error">{error}</p>}
 
-      {inLobby && (
+      {(inLobby || team.status === 'REVIEW_FINAL' || team.status === 'CONTINUATION_VOTING') && (
         <button type="button" onClick={leaveTeam} disabled={busy} className="link-button">
-          Leave team
+          {inLobby ? 'Leave team' : 'Leave team (no penalty)'}
         </button>
       )}
     </div>
