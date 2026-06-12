@@ -65,22 +65,27 @@ function serializeTeam(team: LoadedTeam, currentUserId: string) {
 // Team detail enriched with the current mission idea (+ visible votes) and the
 // number of rejected ideas so far.
 async function buildTeamDetail(team: LoadedTeam, currentUserId: string) {
-  const [idea, rejectedIdeaCount, mission, submission] = await Promise.all([
-    prisma.missionIdea.findFirst({
-      where: { teamId: team.id },
-      orderBy: { createdAt: 'desc' },
-      include: { votes: { include: { user: { select: { id: true, displayName: true } } } } },
-    }),
+  const idea = await prisma.missionIdea.findFirst({
+    where: { teamId: team.id },
+    orderBy: { createdAt: 'desc' },
+    include: { votes: { include: { user: { select: { id: true, displayName: true } } } } },
+  });
+  // The mission shown is the one belonging to the CURRENT idea round. After a
+  // pivot the previous project's mission is preserved history and must not
+  // resurface as the team's active mission.
+  const [rejectedIdeaCount, mission, submission] = await Promise.all([
     prisma.missionIdea.count({ where: { teamId: team.id, status: 'REJECTED' } }),
-    prisma.mission.findFirst({
-      where: { teamId: team.id },
-      orderBy: { startedAt: 'desc' },
-      include: {
-        deliverableAssignments: {
-          include: { assignedTo: { select: { id: true, displayName: true } } },
-        },
-      },
-    }),
+    idea
+      ? prisma.mission.findFirst({
+          where: { teamId: team.id, missionIdeaId: idea.id },
+          orderBy: { startedAt: 'desc' },
+          include: {
+            deliverableAssignments: {
+              include: { assignedTo: { select: { id: true, displayName: true } } },
+            },
+          },
+        })
+      : null,
     prisma.missionSubmission.findFirst({
       where: { teamId: team.id },
       orderBy: { submittedAt: 'desc' },
@@ -568,8 +573,11 @@ router.post(
     const now = new Date();
     const deadlineAt = new Date(now.getTime() + durationHours * 3600 * 1000);
 
+    // Only a draft for the SAME accepted idea is regenerated in place. After a
+    // pivot the accepted idea is new, so a fresh mission record is created and
+    // the old project's mission is preserved untouched.
     const existing = await prisma.mission.findFirst({
-      where: { teamId: team.id },
+      where: { teamId: team.id, missionIdeaId: idea.id },
       orderBy: { startedAt: 'desc' },
     });
 
@@ -624,11 +632,14 @@ router.post(
 
     const idea = await prisma.missionIdea.findFirst({
       where: { teamId: team.id, status: 'ACCEPTED' },
+      orderBy: { createdAt: 'desc' },
     });
     if (!idea) throw new ApiError(409, 'NO_ACCEPTED_IDEA', 'No accepted mission idea.');
 
+    // Scoped to the current idea so a pivoted team can never (re)start the
+    // previous project's mission.
     const mission = await prisma.mission.findFirst({
-      where: { teamId: team.id },
+      where: { teamId: team.id, missionIdeaId: idea.id },
       orderBy: { startedAt: 'desc' },
       include: { deliverableAssignments: true },
     });
