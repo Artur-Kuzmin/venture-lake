@@ -45,12 +45,25 @@ export interface GenerateDeliverablesInput {
   profiles: ProfileInputForAi[];
 }
 
+// Everything the follow-up generator is grounded in (Phase 9.2): the original
+// project direction, what the team actually produced, the VC review feedback,
+// and the team skills. The AI picks the duration from the scope it proposes.
 export interface GenerateFollowUpMissionInput {
   originalMission: { title: string; brief: string; category: string };
-  submissionSummary: string;
+  firstMissionDeliverables: { title: string; description: string }[];
+  submission: { summary: string; pitchText: string | null };
+  vcFeedback: { category: string; score: number; feedback: string }[];
   finalScore: number | null;
   profiles: ProfileInputForAi[];
 }
+
+export interface FollowUpMissionResult extends MissionIdeaResult {
+  // AI-chosen by scope; always clamped to [7, 30] days server-side.
+  durationDays: number;
+}
+
+export const FOLLOW_UP_MIN_DAYS = 7;
+export const FOLLOW_UP_MAX_DAYS = 30;
 
 const AI_API_KEY = process.env.AI_API_KEY ?? '';
 const AI_MODEL = process.env.AI_MODEL ?? 'claude-opus-4-8';
@@ -85,9 +98,22 @@ function assertMissionIdea(value: unknown): MissionIdeaResult {
   return { title: v.title, description: v.description, category: v.category, reasoning: v.reasoning };
 }
 
+function assertFollowUpMission(value: unknown): FollowUpMissionResult {
+  const idea = assertMissionIdea(value);
+  const v = value as { durationDays?: unknown };
+  if (typeof v.durationDays !== 'number' || !Number.isFinite(v.durationDays)) {
+    throw new Error('AI returned a malformed follow-up mission duration.');
+  }
+  const durationDays = Math.min(
+    FOLLOW_UP_MAX_DAYS,
+    Math.max(FOLLOW_UP_MIN_DAYS, Math.round(v.durationDays))
+  );
+  return { ...idea, durationDays };
+}
+
 // ---- Anthropic call ------------------------------------------------------
 
-async function callAnthropic(system: string, user: string): Promise<MissionIdeaResult> {
+async function callAnthropicJson(system: string, user: string, maxTokens = 700): Promise<unknown> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -97,7 +123,7 @@ async function callAnthropic(system: string, user: string): Promise<MissionIdeaR
     },
     body: JSON.stringify({
       model: AI_MODEL,
-      max_tokens: 700,
+      max_tokens: maxTokens,
       system,
       messages: [{ role: 'user', content: user }],
     }),
@@ -106,8 +132,11 @@ async function callAnthropic(system: string, user: string): Promise<MissionIdeaR
     throw new Error(`AI provider error (${res.status}).`);
   }
   const data = (await res.json()) as { content?: { text?: string }[] };
-  const text = data.content?.[0]?.text ?? '';
-  return assertMissionIdea(parseStrictJson<MissionIdeaResult>(text));
+  return parseStrictJson<unknown>(data.content?.[0]?.text ?? '');
+}
+
+async function callAnthropic(system: string, user: string): Promise<MissionIdeaResult> {
+  return assertMissionIdea(await callAnthropicJson(system, user));
 }
 
 // ---- Prompt + profile summarisation -------------------------------------
@@ -309,33 +338,62 @@ export const aiClient = {
     );
   },
 
-  // Longer follow-up mission for a team that voted CONTINUE (Phase 9). Must
-  // build on the original project, never propose a fresh idea.
-  async generateFollowUpMission(input: GenerateFollowUpMissionInput): Promise<MissionIdeaResult> {
+  // Longer follow-up mission for a team that voted CONTINUE (Phase 9.2).
+  // Grounded in the first mission output, the VC feedback, and the team skills
+  // — never a fresh idea. The AI chooses durationDays from the scope it
+  // proposes; the result is clamped to [7, 30] days.
+  async generateFollowUpMission(input: GenerateFollowUpMissionInput): Promise<FollowUpMissionResult> {
     if (AI_API_KEY) {
+      const system =
+        'You design follow-up startup missions for founder teams. Reply with ONLY a single JSON ' +
+        'object with exactly these keys: title, description, category, reasoning (strings) and ' +
+        `durationDays (an integer between ${FOLLOW_UP_MIN_DAYS} and ${FOLLOW_UP_MAX_DAYS}). ` +
+        'No prose, no markdown, no code fences.';
+      const built = input.firstMissionDeliverables
+        .map((d) => `- ${d.title}: ${d.description}`)
+        .join('\n');
+      const feedback = input.vcFeedback
+        .map((f) => `- ${f.category} (${f.score}/10): ${f.feedback}`)
+        .join('\n');
       const user =
         `${summariseTeam(input.profiles)}\n\n` +
-        `The team completed a 72-hour intro mission: "${input.originalMission.title}" — ` +
-        `${input.originalMission.brief}\n` +
-        `Their submission summary: ${input.submissionSummary}\n` +
+        `Original project direction: "${input.originalMission.title}" ` +
+        `(${input.originalMission.category}) — ${input.originalMission.brief}\n\n` +
+        `What the team built in the 72-hour mission:\n${built || '(none)'}\n\n` +
+        `Submission summary: ${input.submission.summary}\n` +
+        (input.submission.pitchText ? `Pitch: ${input.submission.pitchText}\n` : '') +
         (input.finalScore != null
           ? `Final VC review score: ${Math.round(input.finalScore)}/100.\n`
           : '') +
-        '\nPropose ONE follow-up mission for the SAME project that deepens it over 1-2 weeks ' +
-        '(e.g. first real users, a working MVP slice, early traction). It must build directly ' +
-        'on the original mission and submission — do NOT propose a new idea.';
-      return callAnthropic(STRICT_JSON_SYSTEM, user);
+        `\nVC review feedback:\n${feedback || '(none)'}\n\n` +
+        'Design ONE second mission that continues this exact project: build directly on what ' +
+        'exists, address the VC feedback (especially the weakest areas), and match the team ' +
+        'skills. Set the next concrete milestone — do NOT propose a new idea. Choose ' +
+        'durationDays from the scope you propose.';
+      return assertFollowUpMission(await callAnthropicJson(system, user, 900));
     }
+
+    // Deterministic fallback grounded in the same context.
+    const weakest = [...input.vcFeedback].sort((a, b) => a.score - b.score)[0];
+    const durationDays = Math.min(
+      FOLLOW_UP_MAX_DAYS,
+      Math.max(FOLLOW_UP_MIN_DAYS, 7 + input.firstMissionDeliverables.length * 3)
+    );
     return {
       title: `Grow "${input.originalMission.title}" to first users`,
       description:
-        'Build on the 72-hour result: harden what was submitted, close its weakest gaps, and put ' +
-        'the project in front of its first real users with a simple feedback loop and a concrete ' +
-        'usage goal for the week.',
+        `Continue the project submitted as "${input.submission.summary.slice(0, 120)}": harden ` +
+        `what was built` +
+        (weakest
+          ? `, fix the weakest review area (${weakest.category}: ${weakest.feedback.slice(0, 100)})`
+          : '') +
+        ', and put the product in front of its first real users with a measurable weekly goal.',
       category: input.originalMission.category,
       reasoning:
-        'The team voted to continue the same idea, so the follow-up mission extends the original ' +
-        'project toward real usage instead of starting a fresh concept.',
+        'Grounded in the first mission output and the VC review' +
+        (weakest ? ` (lowest-scored area: ${weakest.category})` : '') +
+        `; scoped to ${durationDays} days from the work completed so far.`,
+      durationDays,
     };
   },
 

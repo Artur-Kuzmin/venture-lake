@@ -665,7 +665,6 @@ router.post(
 
 const CONTINUATION_CHOICES = ['CONTINUE', 'PIVOT', 'PUBLISH_END', 'DISBAND_PRIVATE'] as const;
 type ContinuationChoice = (typeof CONTINUATION_CHOICES)[number];
-const FOLLOW_UP_DURATION_HOURS = 168;
 
 // Vote state among ACTIVE members only (votes by members who left don't count).
 async function buildContinuationState(team: LoadedTeam, currentUserId: string) {
@@ -691,9 +690,11 @@ async function buildContinuationState(team: LoadedTeam, currentUserId: string) {
   };
 }
 
-// CONTINUE outcome: AI generates a LONGER follow-up mission tied to the
-// original project (idea is pre-accepted — the team already voted to continue).
-async function startFollowUpMission(team: LoadedTeam) {
+// CONTINUE outcome (Phase 9.2): AI proposes a SECOND, longer mission grounded
+// in the first mission output, the VC feedback, the project direction, and the
+// team skills. The AI picks the duration (7-30 days). It is only a PROPOSAL —
+// the team must approve it unanimously (mission-ideas vote) before it starts.
+async function proposeFollowUpMission(team: LoadedTeam) {
   const [mission, submission, profiles, ideaCount] = await Promise.all([
     prisma.mission.findFirst({
       where: { teamId: team.id },
@@ -703,7 +704,7 @@ async function startFollowUpMission(team: LoadedTeam) {
     prisma.missionSubmission.findFirst({
       where: { teamId: team.id },
       orderBy: { submittedAt: 'desc' },
-      include: { reviews: true },
+      include: { reviews: { where: { status: 'VALID' }, include: { categories: true } } },
     }),
     prisma.founderProfile.findMany({
       where: { userId: { in: team.members.map((m) => m.userId) } },
@@ -723,20 +724,30 @@ async function startFollowUpMission(team: LoadedTeam) {
       brief: mission.brief,
       category: mission.missionIdea.category,
     },
-    submissionSummary: submission.summary,
+    firstMissionDeliverables: (mission.deliverables ?? []) as {
+      title: string;
+      description: string;
+    }[],
+    submission: { summary: submission.summary, pitchText: submission.pitchText },
+    vcFeedback: submission.reviews.flatMap((r) =>
+      r.categories.map((c) => ({ category: c.category, score: c.score, feedback: c.feedback }))
+    ),
     finalScore,
     profiles,
   });
+  const { durationDays, ...followUpIdea } = followUp;
   const deliverables = await aiClient.generateDeliverables({
     mission: { title: followUp.title, brief: followUp.description },
     profiles,
   });
 
+  // Draft mission (placeholder deadline, Phase 5.2 pattern): it holds the
+  // AI-chosen duration but does not run until the unanimous approval starts it.
   const now = new Date();
-  const deadlineAt = new Date(now.getTime() + FOLLOW_UP_DURATION_HOURS * 3600 * 1000);
+  const durationHours = durationDays * 24;
   await prisma.$transaction(async (tx) => {
     const idea = await tx.missionIdea.create({
-      data: { teamId: team.id, ...followUp, status: 'ACCEPTED', generationNumber: ideaCount + 1 },
+      data: { teamId: team.id, ...followUpIdea, status: 'PROPOSED', generationNumber: ideaCount + 1 },
     });
     await tx.mission.create({
       data: {
@@ -744,17 +755,14 @@ async function startFollowUpMission(team: LoadedTeam) {
         missionIdeaId: idea.id,
         title: followUp.title,
         brief: followUp.description,
-        durationHours: FOLLOW_UP_DURATION_HOURS,
+        durationHours,
         deliverables: deliverables as unknown as Prisma.InputJsonValue,
         status: 'ACTIVE',
         startedAt: now,
-        deadlineAt,
+        deadlineAt: new Date(now.getTime() + durationHours * 3600 * 1000),
       },
     });
-    await tx.team.update({
-      where: { id: team.id },
-      data: { status: 'CONTINUING', missionStartedAt: now, missionDeadlineAt: deadlineAt },
-    });
+    await tx.team.update({ where: { id: team.id }, data: { status: 'CONTINUING' } });
   });
 }
 
@@ -773,7 +781,7 @@ async function resolveContinuationVote(team: LoadedTeam): Promise<ContinuationCh
 
   switch (winner) {
     case 'CONTINUE':
-      await startFollowUpMission(team);
+      await proposeFollowUpMission(team);
       break;
     case 'PIVOT':
       // Full reset within the same team: back to the lobby with a clean slate

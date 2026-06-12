@@ -11,6 +11,10 @@ import { requireProfile } from '../middleware/requireProfile.js';
 // All YES -> idea ACCEPTED (team -> CAPTAIN_VOTING). Any NO -> idea REJECTED
 // (team stays IDEA_VOTING, awaiting regeneration). A NO requires a controlled
 // reject reason; an optional free-text note is allowed.
+//
+// The same unanimous vote also approves a follow-up mission proposal while the
+// team is CONTINUING (Phase 9.2): all YES starts the second mission
+// (team -> MISSION_ACTIVE); any NO rejects it and reopens the continuation vote.
 const router = Router();
 router.use(requireAuth, requireProfile);
 
@@ -54,7 +58,8 @@ router.post(
     if (!team.members.some((m) => m.userId === userId)) {
       throw new ApiError(403, 'NOT_TEAM_MEMBER', 'You are not a member of this team.');
     }
-    if (team.status !== 'IDEA_VOTING' || idea.status !== 'PROPOSED') {
+    const isFollowUpApproval = team.status === 'CONTINUING';
+    if ((team.status !== 'IDEA_VOTING' && !isFollowUpApproval) || idea.status !== 'PROPOSED') {
       throw new ApiError(409, 'VOTING_CLOSED', 'Voting is not open for this idea.');
     }
 
@@ -82,8 +87,42 @@ router.post(
     if (votes.length >= team.members.length) {
       const anyNo = votes.some((v) => v.vote === 'NO');
       if (anyNo) {
-        await prisma.missionIdea.update({ where: { id: idea.id }, data: { status: 'REJECTED' } });
+        if (isFollowUpApproval) {
+          // Follow-up rejected: drop the draft mission and reopen the
+          // continuation vote so the team can re-decide what's next.
+          await prisma.$transaction([
+            prisma.missionIdea.update({ where: { id: idea.id }, data: { status: 'REJECTED' } }),
+            prisma.mission.deleteMany({ where: { missionIdeaId: idea.id } }),
+            prisma.continuationVote.deleteMany({ where: { teamId: team.id } }),
+            prisma.team.update({ where: { id: team.id }, data: { status: 'CONTINUATION_VOTING' } }),
+          ]);
+          teamStatus = 'CONTINUATION_VOTING';
+        } else {
+          await prisma.missionIdea.update({ where: { id: idea.id }, data: { status: 'REJECTED' } });
+        }
         ideaStatus = 'REJECTED';
+      } else if (isFollowUpApproval) {
+        // Unanimous approval: the second mission starts now, for the
+        // AI-chosen duration stored on the draft mission.
+        const mission = await prisma.mission.findFirst({ where: { missionIdeaId: idea.id } });
+        if (!mission) {
+          throw new ApiError(409, 'NO_FOLLOW_UP_MISSION', 'The follow-up mission draft is missing.');
+        }
+        const now = new Date();
+        const deadlineAt = new Date(now.getTime() + mission.durationHours * 3600 * 1000);
+        await prisma.$transaction([
+          prisma.missionIdea.update({ where: { id: idea.id }, data: { status: 'ACCEPTED' } }),
+          prisma.mission.update({
+            where: { id: mission.id },
+            data: { status: 'ACTIVE', startedAt: now, deadlineAt },
+          }),
+          prisma.team.update({
+            where: { id: team.id },
+            data: { status: 'MISSION_ACTIVE', missionStartedAt: now, missionDeadlineAt: deadlineAt },
+          }),
+        ]);
+        ideaStatus = 'ACCEPTED';
+        teamStatus = 'MISSION_ACTIVE';
       } else {
         await prisma.$transaction([
           prisma.missionIdea.update({ where: { id: idea.id }, data: { status: 'ACCEPTED' } }),

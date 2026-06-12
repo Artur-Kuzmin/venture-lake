@@ -341,15 +341,41 @@ export default function TeamPage() {
         )}
       </section>
 
-      {idea && (team.status === 'IDEA_VOTING' || team.status === 'CAPTAIN_VOTING') && (
+      {idea &&
+        (team.status === 'IDEA_VOTING' ||
+          team.status === 'CAPTAIN_VOTING' ||
+          team.status === 'CONTINUING') && (
         <section className="queue-state idea-card">
-          <h2>
-            Mission idea <span className="badge">#{idea.generationNumber}</span>
-          </h2>
+          {team.status === 'CONTINUING' ? (
+            <h2>Follow-up mission proposal</h2>
+          ) : (
+            <h2>
+              Mission idea <span className="badge">#{idea.generationNumber}</span>
+            </h2>
+          )}
           <h3>{idea.title}</h3>
           <p className="badge">{idea.category}</p>
           <p>{idea.description}</p>
           <p className="placeholder">{idea.reasoning}</p>
+
+          {team.status === 'CONTINUING' && mission && (
+            <>
+              <p>
+                <strong>Proposed duration:</strong> {Math.round(mission.durationHours / 24)} days
+              </p>
+              <h3>Deliverables</h3>
+              <ul className="party-members">
+                {mission.deliverables.map((d, i) => (
+                  <li key={i}>
+                    <strong>{d.title}</strong> — {d.description}
+                  </li>
+                ))}
+              </ul>
+              <p className="placeholder">
+                The second mission starts only after the whole team approves it.
+              </p>
+            </>
+          )}
 
           {idea.status === 'PROPOSED' && (
             <>
@@ -576,6 +602,13 @@ export default function TeamPage() {
                 <span className="badge"> · {a.assignedToName}</span>
               </li>
             ))}
+            {/* A follow-up mission starts before owners are assigned. */}
+            {mission.assignments.length === 0 &&
+              mission.deliverables.map((d, i) => (
+                <li key={i}>
+                  <strong>{d.title}</strong> — {d.description}
+                </li>
+              ))}
           </ul>
 
           <h3>Final submission</h3>
@@ -779,31 +812,6 @@ export default function TeamPage() {
                 .join(' · ')}
             </p>
           )}
-        </section>
-      )}
-
-      {team.status === 'CONTINUING' && mission && (
-        <section className="queue-state mission-view">
-          <h2>Continuing — follow-up mission</h2>
-          {team.missionDeadlineAt && (
-            <p className="timer">
-              ⏳ {formatRemaining(new Date(team.missionDeadlineAt).getTime() - now)} remaining
-            </p>
-          )}
-          <h3>{mission.title}</h3>
-          <p>{mission.brief}</p>
-          <h3>Deliverables</h3>
-          <ul className="party-members">
-            {mission.deliverables.map((d, i) => (
-              <li key={i}>
-                <strong>{d.title}</strong> — {d.description}
-              </li>
-            ))}
-          </ul>
-          <p className="placeholder">
-            The team voted to continue the same idea — this longer mission builds on the original
-            project.
-          </p>
         </section>
       )}
 
