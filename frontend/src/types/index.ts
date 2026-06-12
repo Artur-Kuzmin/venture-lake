@@ -239,22 +239,31 @@ export interface TeamMessageView {
   createdAt: string;
 }
 
+// A review of the caller's that was appealed by the team. Only the fact and
+// time of the appeal are shared — never the second review, score, or outcome.
+export interface AppealedReviewNotice {
+  reviewId: string;
+  missionTitle: string;
+  appealedAt: string | null;
+}
+
 // Returned by GET /api/vc/me.
 export interface VCMe {
   approved: boolean;
   approvedAt: string | null;
   reviewCooldownUntil: string | null;
+  appealedReviews: AppealedReviewNotice[];
 }
 
 export type VCAssignmentStatus = 'ASSIGNED' | 'ACCEPTED' | 'COMPLETED' | 'EXPIRED' | 'PASSED';
 
 // Anonymized review assignment (GET /api/vc/current-assignment, queue/enter).
-// Contains NO team or member identities.
+// Contains NO team or member identities. Appeal re-reviews are blind, so the
+// view does not even reveal whether this is an appeal review.
 export interface VCAssignmentView {
   assignmentId: string;
   status: VCAssignmentStatus;
   deadlineAt: string | null;
-  isAppealReview: boolean;
   missionTitle: string;
   missionBrief: string;
   deliverables: { title: string; description: string }[];

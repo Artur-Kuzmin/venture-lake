@@ -161,6 +161,23 @@ export default function VCPage() {
     <div className="page">
       <h1>VC Reviewer</h1>
 
+      {vc.appealedReviews.length > 0 && (
+        <div className="queue-state">
+          <p>
+            <strong>⚖️ Appealed reviews</strong>
+          </p>
+          <ul className="party-members">
+            {vc.appealedReviews.map((a) => (
+              <li key={a.reviewId}>
+                Your review of <strong>{a.missionTitle}</strong> was appealed by the team
+                {a.appealedAt ? ` on ${new Date(a.appealedAt).toLocaleDateString()}` : ''} and sent
+                to another reviewer. The outcome is not shared with you.
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {!assignment ? (
         onCooldown ? (
           <div className="queue-state">

@@ -32,7 +32,9 @@ type AssignmentWithSubmission = Prisma.VCReviewAssignmentGetPayload<{
   include: { submission: { include: { mission: true } } };
 }>;
 
-// Anonymized view shown to a VC — NO team or member identities.
+// Anonymized view shown to a VC — NO team or member identities. An appeal
+// re-review is blind (Phase 8.3): the view never includes the first review,
+// its score or feedback, or even the fact that this is an appeal review.
 function buildAssignmentView(assignment: AssignmentWithSubmission) {
   const sub = assignment.submission;
   const mission = sub.mission;
@@ -42,7 +44,6 @@ function buildAssignmentView(assignment: AssignmentWithSubmission) {
     assignmentId: assignment.id,
     status: assignment.status,
     deadlineAt: assignment.deadlineAt,
-    isAppealReview: assignment.isAppealReview,
     missionTitle: mission.title,
     missionBrief: mission.brief,
     deliverables,
@@ -66,15 +67,45 @@ function findActiveAssignment(vcUserId: string) {
   });
 }
 
-// GET /api/vc/me — the caller's VC reviewer status.
+// GET /api/vc/me — the caller's VC reviewer status. Includes reviews of theirs
+// that were appealed (Phase 8.3): only the fact and time of the appeal — never
+// the second review, its score, or the appeal outcome.
 router.get(
   '/me',
   asyncHandler(async (req, res) => {
-    const profile = await prisma.vCProfile.findUnique({ where: { userId: req.user!.userId } });
+    const userId = req.user!.userId;
+    const passedAppeal: Prisma.ReviewAppealWhereInput = {
+      status: { in: ['APPROVED', 'COMPLETED'] },
+    };
+    const [profile, appealedReviews] = await Promise.all([
+      prisma.vCProfile.findUnique({ where: { userId } }),
+      prisma.vCReview.findMany({
+        where: {
+          vcUserId: userId,
+          isAppealReview: false,
+          submission: { appeals: { some: passedAppeal } },
+        },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          submission: {
+            select: {
+              mission: { select: { title: true } },
+              appeals: { where: passedAppeal, select: { createdAt: true }, take: 1 },
+            },
+          },
+        },
+      }),
+    ]);
     sendData(res, {
       approved: profile?.approved ?? false,
       approvedAt: profile?.approvedAt ?? null,
       reviewCooldownUntil: profile?.reviewCooldownUntil ?? null,
+      appealedReviews: appealedReviews.map((r) => ({
+        reviewId: r.id,
+        missionTitle: r.submission.mission.title,
+        appealedAt: r.submission.appeals[0]?.createdAt ?? null,
+      })),
     });
   })
 );
