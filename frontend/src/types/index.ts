@@ -298,6 +298,39 @@ export interface VCAssignmentView {
   };
 }
 
+// Public showcase entry (GET /api/showcase). Only opted-in contributors are
+// listed; VC feedback and category breakdowns are never exposed.
+export interface PublicShowcaseProject {
+  id: string;
+  title: string;
+  tagline: string;
+  shortPitch: string;
+  prototypeUrl: string;
+  finalScore: number;
+  publishedAt: string | null;
+  contributors: string[];
+}
+
+export interface ShowcaseAttributionView {
+  userId: string;
+  displayName: string;
+  visible: boolean;
+}
+
+// Returned by the /api/showcase/team/:teamId endpoints (members only).
+export interface ShowcaseTeamState {
+  id: string;
+  title: string;
+  tagline: string;
+  shortPitch: string;
+  prototypeUrl: string;
+  finalScore: number;
+  isPublic: boolean;
+  publishedAt: string | null;
+  attributions: ShowcaseAttributionView[];
+  myVisible: boolean | null;
+}
+
 // Standard API envelopes (Foundation Bible, Section 4.5).
 export interface ApiSuccess<T> {
   data: T;

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../lib/apiClient';
 import type {
   CaptainVoteState,
   ContinuationChoice,
   ContinuationState,
+  ShowcaseTeamState,
   TeamDetail,
   TeamMessageView,
 } from '../types';
@@ -64,6 +65,13 @@ export default function TeamPage() {
   const [team, setTeam] = useState<TeamDetail | null>(null);
   const [captainVote, setCaptainVote] = useState<CaptainVoteState | null>(null);
   const [continuation, setContinuation] = useState<ContinuationState | null>(null);
+  const [showcase, setShowcase] = useState<ShowcaseTeamState | null>(null);
+  const [publishForm, setPublishForm] = useState({
+    title: '',
+    tagline: '',
+    shortPitch: '',
+    prototypeUrl: '',
+  });
   const [messages, setMessages] = useState<TeamMessageView[]>([]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(true);
@@ -101,6 +109,11 @@ export default function TeamPage() {
       setContinuation(await api.get<ContinuationState>(`/api/teams/${teamId}/continuation`));
     } else {
       setContinuation(null);
+    }
+    if (teamRes.status === 'PUBLISHED') {
+      setShowcase(await api.get<ShowcaseTeamState | null>(`/api/showcase/team/${teamId}`));
+    } else {
+      setShowcase(null);
     }
   }, [teamId]);
 
@@ -213,6 +226,33 @@ export default function TeamPage() {
     (key: keyof typeof submitForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setSubmitForm((p) => ({ ...p, [key]: e.target.value }));
+
+  // Prefill the publish form from the team's own data once, on entering
+  // PUBLISHED (the 3s poll keeps the status constant, so edits are preserved).
+  const teamStatus = team?.status;
+  useEffect(() => {
+    if (teamStatus !== 'PUBLISHED' || !team) return;
+    const sub = team.submission;
+    setPublishForm({
+      title: team.mission?.title ?? '',
+      tagline: '',
+      shortPitch: sub?.pitchText ?? sub?.summary ?? '',
+      prototypeUrl: sub?.prototypeUrl ?? sub?.demoUrl ?? sub?.landingPageUrl ?? '',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamStatus]);
+
+  const publishShowcase = () =>
+    run(() => api.post(`/api/showcase/team/${teamId}/publish`, publishForm), 'Could not publish.');
+  const setAttribution = (visible: boolean) =>
+    run(
+      () => api.post(`/api/showcase/team/${teamId}/attribution`, { visible }),
+      'Could not update your attribution.'
+    );
+  const setPublishField =
+    (key: keyof typeof publishForm) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setPublishForm((p) => ({ ...p, [key]: e.target.value }));
 
   const startContinuationVote = () =>
     run(() => api.post(`/api/teams/${teamId}/continuation/start`), 'Could not start the vote.');
@@ -818,10 +858,91 @@ export default function TeamPage() {
       {team.status === 'PUBLISHED' && (
         <section className="queue-state">
           <h2>Published 🎉</h2>
-          <p>
-            The team voted to publish and end the session. The public showcase flow opens from
-            here.
-          </p>
+          {!showcase ? (
+            <>
+              <p>
+                The team voted to publish. Fill in the public entry — any member can publish it.
+              </p>
+              <div className="submit-form">
+                <label>
+                  Project name *
+                  <input value={publishForm.title} onChange={setPublishField('title')} maxLength={120} />
+                </label>
+                <label>
+                  Tagline *
+                  <input value={publishForm.tagline} onChange={setPublishField('tagline')} maxLength={160} />
+                </label>
+                <label>
+                  Short pitch *
+                  <textarea value={publishForm.shortPitch} onChange={setPublishField('shortPitch')} rows={3} />
+                </label>
+                <label>
+                  Prototype / demo URL *
+                  <input
+                    value={publishForm.prototypeUrl}
+                    onChange={setPublishField('prototypeUrl')}
+                    placeholder="https://"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={publishShowcase}
+                  disabled={
+                    busy ||
+                    !publishForm.title.trim() ||
+                    !publishForm.tagline.trim() ||
+                    !publishForm.shortPitch.trim() ||
+                    !publishForm.prototypeUrl.trim()
+                  }
+                >
+                  {busy ? 'Publishing…' : 'Publish to showcase'}
+                </button>
+              </div>
+              <p className="placeholder">
+                The public page shows the name, tagline, pitch, demo link, the raw final score,
+                and only the members who opt in. VC feedback and category scores stay private.
+              </p>
+            </>
+          ) : (
+            <>
+              <p>
+                <strong>{showcase.title}</strong> is live in the public showcase with a score of{' '}
+                <strong>{showcase.finalScore}/100</strong>.
+              </p>
+              <p>
+                Attribution is personal:{' '}
+                {showcase.myVisible ? 'your name is currently shown.' : 'you are currently hidden.'}
+              </p>
+              <div className="vote-actions">
+                <button
+                  type="button"
+                  onClick={() => setAttribution(true)}
+                  disabled={busy || showcase.myVisible === true}
+                >
+                  Show my name
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAttribution(false)}
+                  disabled={busy || showcase.myVisible === false}
+                  className="link-button"
+                >
+                  Hide me
+                </button>
+              </div>
+              <ul className="party-members">
+                {showcase.attributions.map((a) => (
+                  <li key={a.userId}>
+                    {a.displayName}: {a.visible ? 'shown' : 'hidden'}
+                    {a.userId === team.currentUserId && <span className="badge"> · you</span>}
+                  </li>
+                ))}
+              </ul>
+              <p>
+                <Link to="/showcase">View the public showcase</Link>
+              </p>
+            </>
+          )}
           <button type="button" onClick={requeueIndividually} disabled={busy}>
             {busy ? 'Requeuing…' : 'Requeue individually'}
           </button>
