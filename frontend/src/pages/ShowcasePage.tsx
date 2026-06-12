@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/apiClient';
 import type { PublicShowcaseProject } from '../types';
 
@@ -23,7 +24,15 @@ export default function ShowcasePage() {
       {error && <p className="form-error">{error}</p>}
       {!error && !projects && <p className="placeholder">Loading…</p>}
       {projects && projects.length === 0 && (
-        <p className="placeholder">No published projects yet.</p>
+        <div className="queue-state">
+          <p>No published projects yet.</p>
+          <p className="placeholder">
+            Projects appear here when a team finishes a mission and votes to publish.
+          </p>
+          <p>
+            <Link to="/lobby">Team up in the lobby</Link> and be the first.
+          </p>
+        </div>
       )}
 
       {projects?.map((p) => (

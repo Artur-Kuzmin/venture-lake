@@ -27,7 +27,9 @@ export default function LobbyPage() {
   useEffect(() => {
     let active = true;
     load()
-      .catch(() => {})
+      .catch(() => {
+        if (active) setError('Could not load the lobby. Check your connection and try again.');
+      })
       .finally(() => {
         if (active) setLoading(false);
       });
@@ -74,11 +76,33 @@ export default function LobbyPage() {
     }
   }
 
+  function retry() {
+    setError(null);
+    setLoading(true);
+    load()
+      .catch(() => setError('Could not load the lobby. Check your connection and try again.'))
+      .finally(() => setLoading(false));
+  }
+
   if (loading) {
     return (
       <div className="page">
         <h1>Lobby</h1>
         <p className="placeholder">Loading…</p>
+      </div>
+    );
+  }
+
+  // Initial load failed — show a clear error with a retry instead of an
+  // empty-looking lobby.
+  if (!me) {
+    return (
+      <div className="page">
+        <h1>Lobby</h1>
+        <p className="form-error">{error ?? 'Could not load the lobby.'}</p>
+        <button type="button" onClick={retry}>
+          Try again
+        </button>
       </div>
     );
   }
@@ -93,7 +117,9 @@ export default function LobbyPage() {
 
       {stats && (
         <p className="placeholder">
-          {stats.queuedCount} founder{stats.queuedCount === 1 ? '' : 's'} currently in the global queue.
+          {stats.queuedCount === 0
+            ? 'The queue is empty right now — be the first founder in.'
+            : `${stats.queuedCount} founder${stats.queuedCount === 1 ? '' : 's'} currently in the global queue.`}
         </p>
       )}
 
@@ -118,6 +144,10 @@ export default function LobbyPage() {
         ) : (
           <div className="queue-state">
             <p>You're not in the queue yet.</p>
+            <p className="placeholder">
+              Join the global queue and we'll match you into a founder team based on your skills
+              and interests.
+            </p>
             <button type="button" onClick={handleJoin} disabled={busy}>
               {busy ? 'Joining…' : 'Join Queue'}
             </button>

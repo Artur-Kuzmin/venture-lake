@@ -99,7 +99,7 @@ export default function VCPage() {
     run(async () => {
       const a = await api.post<VCAssignmentView | null>('/api/vc/queue/enter');
       setAssignment(a);
-      if (!a) setInfo('No submissions are available for review right now.');
+      if (!a) setInfo('No submissions are waiting for review right now — check back soon.');
     }, 'Could not enter the review queue.');
 
   const accept = () =>

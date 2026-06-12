@@ -704,7 +704,10 @@ export default function TeamPage() {
         <section className="queue-state">
           <h2>{team.submission.reviewDelayed ? 'Review delayed' : 'Submitted — awaiting VC review'}</h2>
           {team.submission.reviewDelayed && (
-            <p className="form-error">Review delayed — reassigned to the queue.</p>
+            <p className="form-error">
+              Your reviewer missed the 6-hour window, so the submission is back at the front of
+              the review queue. No action needed — the next available VC will pick it up.
+            </p>
           )}
           <p className="placeholder">Submitted by {team.submission.submittedByName}.</p>
           <p>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/apiClient';
 import { ProfileForm } from '../components/ProfileForm';
 import type { FounderProfile, PrimaryRole, ProfileInput } from '../types';
@@ -48,7 +49,16 @@ export default function ProfilePage() {
     return (
       <div className="page">
         <h1>Profile</h1>
-        <p className="placeholder">No profile yet.</p>
+        <div className="queue-state">
+          <p>You haven't created your founder profile yet.</p>
+          <p className="placeholder">
+            Your profile — skills, role, interests, availability — is what the matchmaking uses
+            to build your team. It's required before you can join the queue.
+          </p>
+          <p>
+            <Link to="/create-profile">Create your profile</Link>
+          </p>
+        </div>
       </div>
     );
   }
