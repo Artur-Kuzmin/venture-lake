@@ -47,11 +47,21 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch (networkErr) {
+    // fetch only rejects on network-level failures: the server is unreachable,
+    // VITE_API_BASE_URL is wrong, or the request was blocked by CORS. The
+    // browser hides which, so we surface one clear message. We log the method
+    // and path for debugging but NEVER the request body (it may hold a password).
+    console.error(`[api] network error: ${method} ${BASE_URL}${path}`, networkErr);
+    throw new ApiError(0, 'NETWORK_ERROR', 'Cannot connect to the server.');
+  }
 
   let payload: unknown = null;
   const text = await res.text();
