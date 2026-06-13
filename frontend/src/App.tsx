@@ -37,28 +37,60 @@ function NavBar() {
   }
 
   return (
-    <nav className="app-nav">
-      {isAuthenticated ? (
-        <>
-          <Link to="/lobby">Lobby</Link>
-          <Link to="/profile">Profile</Link>
-          <Link to="/showcase">Showcase</Link>
-          {isVc && <Link to="/vc">VC Mode</Link>}
-          {isAdmin && <Link to="/admin">Admin</Link>}
-          <button type="button" onClick={handleLogout} className="link-button">
-            Log out
-          </button>
-        </>
-      ) : (
-        <>
-          <Link to="/">Home</Link>
-          <Link to="/how-it-works">How it works</Link>
-          <Link to="/showcase">Showcase</Link>
-          <Link to="/login">Log in</Link>
-          <Link to="/signup">Get started</Link>
-        </>
-      )}
-    </nav>
+    <header className="app-header">
+      <div className="app-header__inner">
+        <Link to="/" className="brand">
+          <span className="brand__mark" aria-hidden="true" />
+          VentureLake
+        </Link>
+        <nav className="app-nav">
+          {isAuthenticated ? (
+            <>
+              <Link className="nav-link" to="/lobby">
+                Lobby
+              </Link>
+              <Link className="nav-link" to="/profile">
+                Profile
+              </Link>
+              <Link className="nav-link" to="/showcase">
+                Showcase
+              </Link>
+              {isVc && (
+                <Link className="nav-link" to="/vc">
+                  VC Mode
+                </Link>
+              )}
+              {isAdmin && (
+                <Link className="nav-link" to="/admin">
+                  Admin
+                </Link>
+              )}
+              <button type="button" onClick={handleLogout} className="btn btn--ghost btn--sm">
+                Log out
+              </button>
+            </>
+          ) : (
+            <>
+              <Link className="nav-link" to="/">
+                Home
+              </Link>
+              <Link className="nav-link" to="/how-it-works">
+                How it works
+              </Link>
+              <Link className="nav-link" to="/showcase">
+                Showcase
+              </Link>
+              <Link className="nav-link" to="/login">
+                Log in
+              </Link>
+              <Link className="btn btn--sm" to="/signup">
+                Get started
+              </Link>
+            </>
+          )}
+        </nav>
+      </div>
+    </header>
   );
 }
 
@@ -93,7 +125,8 @@ export default function App() {
     <div className="app-shell">
       <NavBar />
 
-      <Routes>
+      <main className="app-main">
+        <Routes>
         <Route path="/" element={<RootRoute />} />
         <Route path="/how-it-works" element={<HowItWorksPage />} />
         <Route path="/showcase" element={<ShowcasePage />} />
@@ -161,8 +194,9 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="*" element={<WildcardRoute />} />
-      </Routes>
+          <Route path="*" element={<WildcardRoute />} />
+        </Routes>
+      </main>
     </div>
   );
 }
