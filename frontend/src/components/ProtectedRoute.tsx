@@ -1,62 +1,47 @@
-import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../lib/authContext';
-import { api } from '../lib/apiClient';
-import type { FounderProfile } from '../types';
 
-// Guards routes:
-//  - unauthenticated  -> redirect to /login
-//  - requireProfile && no founder profile -> redirect to /create-profile
-// Profile presence is checked against the backend (source of truth).
+// Guards routes against the authenticated viewer status (single source of truth
+// in authContext):
+//  - unauthenticated            -> /login
+//  - requireProfile, no profile -> /create-profile
+//  - requireAdmin, not admin    -> /lobby
+//  - requireVc, not approved VC -> /lobby
+// While viewer status is still loading, a placeholder is shown so we never
+// redirect on stale/empty status.
 export function ProtectedRoute({
   children,
   requireProfile = false,
+  requireAdmin = false,
+  requireVc = false,
 }: {
   children: ReactNode;
   requireProfile?: boolean;
+  requireAdmin?: boolean;
+  requireVc?: boolean;
 }) {
-  const { isAuthenticated } = useAuth();
-  const location = useLocation();
-  const [profileStatus, setProfileStatus] = useState<'loading' | 'present' | 'missing'>('loading');
-
-  useEffect(() => {
-    if (!isAuthenticated || !requireProfile) return;
-    let active = true;
-    setProfileStatus('loading');
-    api
-      .get<FounderProfile | null>('/api/profile/me')
-      .then((profile) => {
-        if (active) setProfileStatus(profile ? 'present' : 'missing');
-      })
-      .catch(() => {
-        if (active) setProfileStatus('missing');
-      });
-    return () => {
-      active = false;
-    };
-  }, [isAuthenticated, requireProfile, location.pathname]);
+  const { isAuthenticated, viewerLoading, hasProfile, isAdmin, isVc } = useAuth();
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return <Navigate to="/login" replace />;
   }
-
-  if (!requireProfile) {
-    return <>{children}</>;
-  }
-
-  if (profileStatus === 'loading') {
+  if (viewerLoading) {
     return (
       <div className="page">
         <p className="placeholder">Loading…</p>
       </div>
     );
   }
-
-  if (profileStatus === 'missing') {
+  if (requireProfile && !hasProfile) {
     return <Navigate to="/create-profile" replace />;
   }
-
+  if (requireAdmin && !isAdmin) {
+    return <Navigate to="/lobby" replace />;
+  }
+  if (requireVc && !isVc) {
+    return <Navigate to="/lobby" replace />;
+  }
   return <>{children}</>;
 }
 

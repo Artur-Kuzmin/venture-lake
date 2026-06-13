@@ -24,8 +24,9 @@ export default function LoginPage() {
         { auth: false }
       );
       login(res.token, res.user);
-      // /profile is profile-guarded: it redirects to /create-profile if missing.
-      navigate('/profile');
+      // Root routes to the right place once viewer status loads (lobby if the
+      // user has a profile, otherwise create-profile).
+      navigate('/');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Login failed. Please try again.');
     } finally {

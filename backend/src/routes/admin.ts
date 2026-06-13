@@ -33,6 +33,16 @@ async function setVcApproval(userId: string, approved: boolean) {
   };
 }
 
+// GET /api/admin/me — lightweight admin-status check for the frontend nav.
+// Only admins reach this handler (requireAdmin gates the router); everyone
+// else gets a 403, which the client reads as "not an admin". No business logic.
+router.get(
+  '/me',
+  asyncHandler(async (_req, res) => {
+    sendData(res, { admin: true });
+  })
+);
+
 // POST /api/admin/users/:id/approve-vc — grant VC reviewer access.
 router.post(
   '/users/:id/approve-vc',
