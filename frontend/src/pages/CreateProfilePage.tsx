@@ -18,8 +18,13 @@ export default function CreateProfilePage() {
 
   return (
     <div className="page">
-      <h1>Create founder profile</h1>
-      <p className="placeholder">Complete your profile to enter the queue.</p>
+      <span className="home-eyebrow">Founder signal</span>
+      <h1>Set up your Founder Signal</h1>
+      <p className="placeholder profile-intro">
+        Your Founder Signal powers matchmaking — your role, skills, availability, and interests
+        decide which team you're placed on. Be precise; it's how we build a balanced team around
+        you.
+      </p>
       <ProfileForm submitLabel="Create profile" onSubmit={handleCreate} />
     </div>
   );

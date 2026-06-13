@@ -36,29 +36,51 @@ export default function LoginPage() {
 
   return (
     <div className="page">
-      <h1>Log in</h1>
-      <form onSubmit={handleSubmit} className="auth-form">
-        <label>
-          Email
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </label>
-        {error && <p className="form-error">{error}</p>}
-        <button type="submit" disabled={submitting}>
-          {submitting ? 'Logging in…' : 'Log in'}
-        </button>
-      </form>
-      <p>
-        Need an account? <Link to="/signup">Sign up</Link>
-      </p>
+      <div className="auth-layout">
+        <aside className="auth-aside">
+          <Link to="/" className="brand">
+            <span className="brand__mark" aria-hidden="true" />
+            VentureLake
+          </Link>
+          <h2>Build teams around execution, not bios.</h2>
+          <p>
+            Log back into your founder workspace — your queue, your team, and your missions are
+            waiting.
+          </p>
+          <ul className="auth-points">
+            <li>Pick up where your team left off</li>
+            <li>Track live mission countdowns</li>
+            <li>Review scores and decide what's next</li>
+          </ul>
+        </aside>
+
+        <div className="auth-card">
+          <h1>Welcome back</h1>
+          <p className="auth-card__sub">Log in to your founder workspace.</p>
+          <form onSubmit={handleSubmit} className="auth-form">
+            <label>
+              Email
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </label>
+            <label>
+              Password
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </label>
+            {error && <p className="form-error">{error}</p>}
+            <button type="submit" disabled={submitting}>
+              {submitting ? 'Logging in…' : 'Log in'}
+            </button>
+          </form>
+          <p className="auth-switch">
+            Need an account? <Link to="/signup">Sign up</Link>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

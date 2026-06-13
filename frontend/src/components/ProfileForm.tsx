@@ -93,89 +93,111 @@ export function ProfileForm({
 
   return (
     <form onSubmit={handleSubmit} className="profile-form">
-      <label>
-        Name
-        <input value={name} onChange={(e) => setName(e.target.value)} required />
-      </label>
-
-      <label>
-        City
-        <input value={city} onChange={(e) => setCity(e.target.value)} required />
-      </label>
-
-      <label>
-        Timezone
-        <input
-          value={timezone}
-          onChange={(e) => setTimezone(e.target.value)}
-          placeholder="e.g. Europe/Berlin"
-          required
-        />
-      </label>
-
-      <label>
-        Languages (comma-separated)
-        <input
-          value={languages}
-          onChange={(e) => setLanguages(e.target.value)}
-          placeholder="e.g. English, German"
-          required
-        />
-      </label>
-
-      <label>
-        Primary role
-        <select value={primaryRole} onChange={(e) => setPrimaryRole(e.target.value as PrimaryRole)}>
-          {PRIMARY_ROLE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <fieldset>
-        <legend>Skills</legend>
-        <div className="checkbox-grid">
-          {SKILLS.map((skill) => (
-            <label key={skill} className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={skills.includes(skill)}
-                onChange={() => toggleSkill(skill)}
-              />
-              {skill}
-            </label>
-          ))}
+      <section className="form-group">
+        <div className="form-group__title">
+          <span>01</span>
+          <h3>Basic identity</h3>
         </div>
-      </fieldset>
+        <label>
+          Name
+          <input value={name} onChange={(e) => setName(e.target.value)} required />
+        </label>
+        <label>
+          City
+          <input value={city} onChange={(e) => setCity(e.target.value)} required />
+        </label>
+        <label>
+          Languages (comma-separated)
+          <input
+            value={languages}
+            onChange={(e) => setLanguages(e.target.value)}
+            placeholder="e.g. English, German"
+            required
+          />
+        </label>
+      </section>
 
-      <label>
-        Industry interests (comma-separated)
-        <input
-          value={industryInterests}
-          onChange={(e) => setIndustryInterests(e.target.value)}
-          placeholder="e.g. Fintech, Climate"
-          required
-        />
-      </label>
+      <section className="form-group">
+        <div className="form-group__title">
+          <span>02</span>
+          <h3>Role &amp; skills</h3>
+        </div>
+        <label>
+          Primary role
+          <select
+            value={primaryRole}
+            onChange={(e) => setPrimaryRole(e.target.value as PrimaryRole)}
+          >
+            {PRIMARY_ROLE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="field">
+          <span className="field__label">Skills</span>
+          <div className="checkbox-grid">
+            {SKILLS.map((skill) => (
+              <label key={skill} className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={skills.includes(skill)}
+                  onChange={() => toggleSkill(skill)}
+                />
+                {skill}
+              </label>
+            ))}
+          </div>
+        </div>
+      </section>
 
-      <label>
-        Availability (hours per week)
-        <input
-          type="number"
-          min={0}
-          max={168}
-          value={availability}
-          onChange={(e) => setAvailability(e.target.value)}
-          required
-        />
-      </label>
+      <section className="form-group">
+        <div className="form-group__title">
+          <span>03</span>
+          <h3>Availability &amp; timezone</h3>
+        </div>
+        <label>
+          Timezone
+          <input
+            value={timezone}
+            onChange={(e) => setTimezone(e.target.value)}
+            placeholder="e.g. Europe/Berlin"
+            required
+          />
+        </label>
+        <label>
+          Availability (hours per week)
+          <input
+            type="number"
+            min={0}
+            max={168}
+            value={availability}
+            onChange={(e) => setAvailability(e.target.value)}
+            required
+          />
+        </label>
+      </section>
 
-      <label>
-        Bio
-        <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} />
-      </label>
+      <section className="form-group">
+        <div className="form-group__title">
+          <span>04</span>
+          <h3>Interests &amp; bio</h3>
+        </div>
+        <label>
+          Industry interests (comma-separated)
+          <input
+            value={industryInterests}
+            onChange={(e) => setIndustryInterests(e.target.value)}
+            placeholder="e.g. Fintech, Climate"
+            required
+          />
+        </label>
+        <label>
+          Bio
+          <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} />
+        </label>
+      </section>
 
       {error && <p className="form-error">{error}</p>}
 
