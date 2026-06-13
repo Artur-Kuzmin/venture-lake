@@ -135,7 +135,8 @@ export default function LobbyPage() {
         ) : isQueued ? (
           <div className="queue-state">
             <p>
-              <strong>You're in the queue.</strong> Hang tight — we'll match you into a team.
+              <span className="pulse-dot" aria-hidden="true" />
+              <strong>Searching for a team…</strong> Hang tight — we'll match you on skill coverage.
             </p>
             <button type="button" onClick={handleLeave} disabled={busy}>
               {busy ? 'Leaving…' : 'Leave Queue'}
