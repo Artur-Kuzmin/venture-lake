@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../lib/authContext';
+import { Loading } from './Loading';
 
 // Guards routes against the authenticated viewer status (single source of truth
 // in authContext):
@@ -29,7 +30,7 @@ export function ProtectedRoute({
   if (viewerLoading) {
     return (
       <div className="page">
-        <p className="placeholder">Loading…</p>
+        <Loading />
       </div>
     );
   }

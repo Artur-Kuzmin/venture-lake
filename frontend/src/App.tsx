@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { useAuth } from './lib/authContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { Loading } from './components/Loading';
 import HomePage from './pages/HomePage';
 import HowItWorksPage from './pages/HowItWorksPage';
 import SignupPage from './pages/SignupPage';
@@ -17,10 +18,16 @@ import AdminPage from './pages/AdminPage';
 function PageLoading() {
   return (
     <div className="page">
-      <p className="placeholder">Loading…</p>
+      <Loading />
     </div>
   );
 }
+
+// Active-route styling for nav links (React Router adds isActive).
+const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+  isActive ? 'nav-link nav-link--active' : 'nav-link';
+const utilLinkClass = ({ isActive }: { isActive: boolean }) =>
+  isActive ? 'nav-link nav-link--utility nav-link--active' : 'nav-link nav-link--utility';
 
 // Where an authenticated user belongs by default.
 function homeFor(hasProfile: boolean): string {
@@ -46,24 +53,25 @@ function NavBar() {
         <nav className="app-nav">
           {isAuthenticated ? (
             <>
-              <Link className="nav-link" to="/lobby">
+              <NavLink className={navLinkClass} to="/lobby">
                 Lobby
-              </Link>
-              <Link className="nav-link" to="/profile">
+              </NavLink>
+              <NavLink className={navLinkClass} to="/profile">
                 Profile
-              </Link>
-              <Link className="nav-link" to="/showcase">
+              </NavLink>
+              <NavLink className={navLinkClass} to="/showcase">
                 Showcase
-              </Link>
+              </NavLink>
+              {(isVc || isAdmin) && <span className="nav-divider" aria-hidden="true" />}
               {isVc && (
-                <Link className="nav-link" to="/vc">
+                <NavLink className={utilLinkClass} to="/vc">
                   VC Mode
-                </Link>
+                </NavLink>
               )}
               {isAdmin && (
-                <Link className="nav-link" to="/admin">
+                <NavLink className={utilLinkClass} to="/admin">
                   Admin
-                </Link>
+                </NavLink>
               )}
               <button type="button" onClick={handleLogout} className="btn btn--ghost btn--sm">
                 Log out
@@ -71,18 +79,18 @@ function NavBar() {
             </>
           ) : (
             <>
-              <Link className="nav-link" to="/">
+              <NavLink className={navLinkClass} to="/" end>
                 Home
-              </Link>
-              <Link className="nav-link" to="/how-it-works">
+              </NavLink>
+              <NavLink className={navLinkClass} to="/how-it-works">
                 How it works
-              </Link>
-              <Link className="nav-link" to="/showcase">
+              </NavLink>
+              <NavLink className={navLinkClass} to="/showcase">
                 Showcase
-              </Link>
-              <Link className="nav-link" to="/login">
+              </NavLink>
+              <NavLink className={navLinkClass} to="/login">
                 Log in
-              </Link>
+              </NavLink>
               <Link className="btn btn--sm" to="/signup">
                 Get started
               </Link>

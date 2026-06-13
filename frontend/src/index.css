@@ -181,6 +181,39 @@ a:hover {
   text-decoration: none;
 }
 
+/* Active route */
+.nav-link--active {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.nav-link--active:hover {
+  text-decoration: none;
+}
+
+/* Utility links (Admin / VC) read as system tools, not marketing tabs. */
+.nav-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 0.35rem;
+  background: var(--border-strong);
+}
+
+.nav-link--utility {
+  color: var(--text-subtle);
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+}
+
+.nav-link--utility:hover {
+  color: var(--text-muted);
+}
+
+.nav-link--utility.nav-link--active {
+  color: var(--accent-strong);
+  background: var(--accent-weak);
+}
+
 .app-main {
   max-width: var(--container);
   margin: 0 auto;
@@ -211,6 +244,33 @@ a:hover {
 
 .placeholder {
   color: var(--text-muted);
+}
+
+/* Loading state ---------------------------------------------------------- */
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+}
+
+.spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Buttons ---------------------------------------------------------------- */
@@ -417,6 +477,13 @@ textarea {
   box-shadow: var(--shadow-sm), var(--inner-hi);
   max-width: 620px;
   margin-top: 1.25rem;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+/* Subtle depth on hover — brightening, not a click-implying lift. */
+.queue-state:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md), var(--inner-hi);
 }
 
 .queue-state h2 {
