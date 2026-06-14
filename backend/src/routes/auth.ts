@@ -7,10 +7,15 @@ import { prisma } from '../lib/prisma.js';
 import { signToken } from '../lib/jwt.js';
 import { sendData, ApiError } from '../lib/response.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 
 // Auth routes (Foundation Bible, Section 4.3). Backend-owned JWT: signup/login
 // hash the password and issue a short-lived Bearer token.
 const router = Router();
+
+// Throttle auth attempts per IP to blunt brute-force / credential stuffing.
+// Generous enough not to hinder normal use; far below what an attacker needs.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 30 }));
 
 const signupSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
