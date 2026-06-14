@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 
 import { errorHandler } from './middleware/errorHandler.js';
 import { sendData } from './lib/response.js';
@@ -23,9 +24,24 @@ import adminRoutes from './routes/admin.js';
 
 const app = express();
 
+// Behind a proxy/load balancer, trust the first hop so req.ip (used by the auth
+// rate limiter) reflects the real client. Opt-in to avoid spoofable IPs in dev.
+if (process.env.TRUST_PROXY === 'true') {
+  app.set('trust proxy', 1);
+}
+
+// Baseline security headers (safe defaults for a JSON API).
+app.use(helmet());
+
 const corsOrigin = process.env.CORS_ORIGIN?.split(',').map((o) => o.trim());
+if ((!corsOrigin || corsOrigin.length === 0) && process.env.NODE_ENV === 'production') {
+  console.warn(
+    '[cors] CORS_ORIGIN is not set — allowing all origins. Set CORS_ORIGIN to your frontend origin in production.'
+  );
+}
 app.use(cors({ origin: corsOrigin && corsOrigin.length > 0 ? corsOrigin : true }));
-app.use(express.json());
+// Cap request bodies to a sane size; the app only sends small JSON payloads.
+app.use(express.json({ limit: '1mb' }));
 
 // Health check.
 app.get('/health', (_req, res) => {
