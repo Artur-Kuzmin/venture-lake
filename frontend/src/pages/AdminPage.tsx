@@ -31,17 +31,34 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="page">
-      <h1>Admin</h1>
-      <div className="queue-state">
-        <h2>VC approval</h2>
+    <div className="page admin-page">
+      <header className="admin-header">
+        <div>
+          <span className="qt-syslabel admin-syslabel">Internal // Control panel</span>
+          <h1>Admin</h1>
+        </div>
+        <span className="status status--warning">Admin only</span>
+      </header>
+
+      <p className="admin-note">
+        Internal control panel — visible only to admins. Every action here is enforced server-side.
+        Use with care.
+      </p>
+
+      <section className="queue-state admin-card">
+        <h2>VC reviewer approval</h2>
         <p className="placeholder">Approve or revoke a user's VC reviewer access by user id.</p>
-        <input
-          className="admin-input"
-          value={userId}
-          onChange={(e) => setUserId(e.target.value)}
-          placeholder="User id"
-        />
+
+        <label className="admin-field">
+          User id
+          <input
+            className="admin-input"
+            value={userId}
+            onChange={(e) => setUserId(e.target.value)}
+            placeholder="e.g. clx1a2b3…"
+          />
+        </label>
+
         <div className="vote-actions">
           <button type="button" onClick={() => call('approve-vc')} disabled={busy || !userId.trim()}>
             Approve VC
@@ -55,9 +72,18 @@ export default function AdminPage() {
             Revoke VC
           </button>
         </div>
-        {result && <p>{result}</p>}
-        {error && <p className="form-error">{error}</p>}
-      </div>
+
+        {result && (
+          <p className="admin-result">
+            <span className="status status--success">Done</span> {result}
+          </p>
+        )}
+        {error && (
+          <p className="admin-result">
+            <span className="status status--danger">Error</span> {error}
+          </p>
+        )}
+      </section>
     </div>
   );
 }
