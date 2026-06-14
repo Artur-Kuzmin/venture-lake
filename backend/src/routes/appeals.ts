@@ -143,27 +143,49 @@ router.post(
     const yesCount = votes.filter((v) => v.vote === 'YES').length;
     const noCount = votes.filter((v) => v.vote === 'NO').length;
 
+    // Decide by the same rules, then apply with a single-winner latch: only the
+    // request that flips the appeal out of OPEN runs the submission/team side
+    // effects. A concurrent deciding vote reads the already-decided status, so
+    // the two can never leave the submission/team in conflicting states.
     let decided: AppealWithVotes['status'] = 'OPEN';
-    if (yesCount >= majorityNeeded) {
-      decided = 'APPROVED';
-      await prisma.$transaction([
-        prisma.reviewAppeal.update({ where: { id: appeal.id }, data: { status: 'APPROVED' } }),
-        prisma.missionSubmission.update({
-          where: { id: appeal.submissionId },
-          data: { status: 'SUBMITTED' },
-        }),
-        prisma.team.update({ where: { id: appeal.teamId }, data: { status: 'UNDER_REVIEW' } }),
-      ]);
-    } else if (memberCount - noCount < majorityNeeded) {
-      decided = 'REJECTED';
-      await prisma.$transaction([
-        prisma.reviewAppeal.update({ where: { id: appeal.id }, data: { status: 'REJECTED' } }),
-        prisma.missionSubmission.update({
-          where: { id: appeal.submissionId },
-          data: { status: 'FINAL' },
-        }),
-        prisma.team.update({ where: { id: appeal.teamId }, data: { status: 'REVIEW_FINAL' } }),
-      ]);
+    const target: 'APPROVED' | 'REJECTED' | null =
+      yesCount >= majorityNeeded
+        ? 'APPROVED'
+        : memberCount - noCount < majorityNeeded
+          ? 'REJECTED'
+          : null;
+    if (target) {
+      const claim = await prisma.reviewAppeal.updateMany({
+        where: { id: appeal.id, status: 'OPEN' },
+        data: { status: target },
+      });
+      if (claim.count === 1) {
+        decided = target;
+        if (target === 'APPROVED') {
+          await prisma.$transaction([
+            prisma.missionSubmission.update({
+              where: { id: appeal.submissionId },
+              data: { status: 'SUBMITTED' },
+            }),
+            prisma.team.update({ where: { id: appeal.teamId }, data: { status: 'UNDER_REVIEW' } }),
+          ]);
+        } else {
+          await prisma.$transaction([
+            prisma.missionSubmission.update({
+              where: { id: appeal.submissionId },
+              data: { status: 'FINAL' },
+            }),
+            prisma.team.update({ where: { id: appeal.teamId }, data: { status: 'REVIEW_FINAL' } }),
+          ]);
+        }
+      } else {
+        // Already decided by a concurrent request — reflect the actual outcome.
+        const current = await prisma.reviewAppeal.findUnique({
+          where: { id: appeal.id },
+          select: { status: true },
+        });
+        decided = current?.status ?? 'OPEN';
+      }
     }
 
     sendData(res, buildAppealView({ ...appeal, votes, status: decided }, memberCount));

@@ -543,7 +543,12 @@ router.post(
       }
     }
     if (electedId) {
-      await prisma.team.update({ where: { id: team.id }, data: { captainId: electedId } });
+      // Single-winner latch: only assign a captain if none has been set yet, so
+      // simultaneous deciding votes can't overwrite each other.
+      await prisma.team.updateMany({
+        where: { id: team.id, status: 'CAPTAIN_VOTING', captainId: null },
+        data: { captainId: electedId },
+      });
     }
 
     const updated = await loadTeam(team.id);
@@ -784,6 +789,14 @@ async function proposeFollowUpMission(team: LoadedTeam) {
   const now = new Date();
   const durationHours = durationDays * 24;
   await prisma.$transaction(async (tx) => {
+    // Single-winner latch: claim the transition out of CONTINUATION_VOTING
+    // atomically with creating the proposal. A concurrent CONTINUE resolution
+    // finds count 0 and aborts, so no duplicate follow-up proposal is created.
+    const claim = await tx.team.updateMany({
+      where: { id: team.id, status: 'CONTINUATION_VOTING' },
+      data: { status: 'CONTINUING' },
+    });
+    if (claim.count === 0) return;
     const idea = await tx.missionIdea.create({
       data: { teamId: team.id, ...followUpIdea, status: 'PROPOSED', generationNumber: ideaCount + 1 },
     });
@@ -800,7 +813,6 @@ async function proposeFollowUpMission(team: LoadedTeam) {
         deadlineAt: new Date(now.getTime() + durationHours * 3600 * 1000),
       },
     });
-    await tx.team.update({ where: { id: team.id }, data: { status: 'CONTINUING' } });
   });
 }
 
@@ -817,6 +829,9 @@ async function resolveContinuationVote(team: LoadedTeam): Promise<ContinuationCh
   const winner = CONTINUATION_CHOICES.find((c) => (counts.get(c) ?? 0) >= majorityNeeded) ?? null;
   if (!winner) return null;
 
+  // Each branch claims the transition with a status-guarded updateMany so a
+  // concurrent deciding vote (or the leave-team re-resolve) can't double-apply
+  // it. CONTINUE's claim lives inside proposeFollowUpMission's transaction.
   switch (winner) {
     case 'CONTINUE':
       await proposeFollowUpMission(team);
@@ -824,28 +839,35 @@ async function resolveContinuationVote(team: LoadedTeam): Promise<ContinuationCh
     case 'PIVOT':
       // Full reset within the same team: back to the lobby with a clean slate
       // (captain, captain votes, ready flags, continuation votes). Mission and
-      // review history is kept.
-      await prisma.$transaction([
-        prisma.captainNomination.deleteMany({ where: { teamId: team.id } }),
-        prisma.captainVote.deleteMany({ where: { teamId: team.id } }),
-        prisma.continuationVote.deleteMany({ where: { teamId: team.id } }),
-        prisma.teamMember.updateMany({
+      // review history is kept. Claim + reset run atomically.
+      await prisma.$transaction(async (tx) => {
+        const claim = await tx.team.updateMany({
+          where: { id: team.id, status: 'CONTINUATION_VOTING' },
+          data: { status: 'LOBBY', captainId: null, missionStartedAt: null, missionDeadlineAt: null },
+        });
+        if (claim.count === 0) return;
+        await tx.captainNomination.deleteMany({ where: { teamId: team.id } });
+        await tx.captainVote.deleteMany({ where: { teamId: team.id } });
+        await tx.continuationVote.deleteMany({ where: { teamId: team.id } });
+        await tx.teamMember.updateMany({
           where: { teamId: team.id, leftAt: null },
           data: { ready: false },
-        }),
-        prisma.team.update({
-          where: { id: team.id },
-          data: { status: 'LOBBY', captainId: null, missionStartedAt: null, missionDeadlineAt: null },
-        }),
-      ]);
+        });
+      });
       break;
     case 'PUBLISH_END':
       // Showcase flow (Phase 10) opens for PUBLISHED teams.
-      await prisma.team.update({ where: { id: team.id }, data: { status: 'PUBLISHED' } });
+      await prisma.team.updateMany({
+        where: { id: team.id, status: 'CONTINUATION_VOTING' },
+        data: { status: 'PUBLISHED' },
+      });
       break;
     case 'DISBAND_PRIVATE':
       // Session ends privately — nothing is published; members may requeue.
-      await prisma.team.update({ where: { id: team.id }, data: { status: 'DISBANDED' } });
+      await prisma.team.updateMany({
+        where: { id: team.id, status: 'CONTINUATION_VOTING' },
+        data: { status: 'DISBANDED' },
+      });
       break;
   }
   return winner;

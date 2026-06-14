@@ -86,50 +86,52 @@ router.post(
 
     if (votes.length >= team.members.length) {
       const anyNo = votes.some((v) => v.vote === 'NO');
-      if (anyNo) {
-        if (isFollowUpApproval) {
+      const decided = anyNo ? 'REJECTED' : 'ACCEPTED';
+      // Single-winner latch: only the request that flips the idea out of
+      // PROPOSED runs the team/mission side effects. A concurrent deciding vote
+      // sees count 0 and skips them; both report the same resolved state.
+      const latch = await prisma.missionIdea.updateMany({
+        where: { id: idea.id, status: 'PROPOSED' },
+        data: { status: decided },
+      });
+      if (latch.count === 1) {
+        if (anyNo && isFollowUpApproval) {
           // Follow-up rejected: drop the draft mission and reopen the
           // continuation vote so the team can re-decide what's next.
           await prisma.$transaction([
-            prisma.missionIdea.update({ where: { id: idea.id }, data: { status: 'REJECTED' } }),
             prisma.mission.deleteMany({ where: { missionIdeaId: idea.id } }),
             prisma.continuationVote.deleteMany({ where: { teamId: team.id } }),
             prisma.team.update({ where: { id: team.id }, data: { status: 'CONTINUATION_VOTING' } }),
           ]);
-          teamStatus = 'CONTINUATION_VOTING';
-        } else {
-          await prisma.missionIdea.update({ where: { id: idea.id }, data: { status: 'REJECTED' } });
+        } else if (!anyNo && isFollowUpApproval) {
+          // Unanimous approval: the second mission starts now, for the
+          // AI-chosen duration stored on the draft mission.
+          const mission = await prisma.mission.findFirst({ where: { missionIdeaId: idea.id } });
+          if (!mission) {
+            throw new ApiError(409, 'NO_FOLLOW_UP_MISSION', 'The follow-up mission draft is missing.');
+          }
+          const now = new Date();
+          const deadlineAt = new Date(now.getTime() + mission.durationHours * 3600 * 1000);
+          await prisma.$transaction([
+            prisma.mission.update({
+              where: { id: mission.id },
+              data: { status: 'ACTIVE', startedAt: now, deadlineAt },
+            }),
+            prisma.team.update({
+              where: { id: team.id },
+              data: { status: 'MISSION_ACTIVE', missionStartedAt: now, missionDeadlineAt: deadlineAt },
+            }),
+          ]);
+        } else if (!anyNo) {
+          await prisma.team.update({ where: { id: team.id }, data: { status: 'CAPTAIN_VOTING' } });
         }
-        ideaStatus = 'REJECTED';
-      } else if (isFollowUpApproval) {
-        // Unanimous approval: the second mission starts now, for the
-        // AI-chosen duration stored on the draft mission.
-        const mission = await prisma.mission.findFirst({ where: { missionIdeaId: idea.id } });
-        if (!mission) {
-          throw new ApiError(409, 'NO_FOLLOW_UP_MISSION', 'The follow-up mission draft is missing.');
-        }
-        const now = new Date();
-        const deadlineAt = new Date(now.getTime() + mission.durationHours * 3600 * 1000);
-        await prisma.$transaction([
-          prisma.missionIdea.update({ where: { id: idea.id }, data: { status: 'ACCEPTED' } }),
-          prisma.mission.update({
-            where: { id: mission.id },
-            data: { status: 'ACTIVE', startedAt: now, deadlineAt },
-          }),
-          prisma.team.update({
-            where: { id: team.id },
-            data: { status: 'MISSION_ACTIVE', missionStartedAt: now, missionDeadlineAt: deadlineAt },
-          }),
-        ]);
-        ideaStatus = 'ACCEPTED';
-        teamStatus = 'MISSION_ACTIVE';
+        // A normal rejection leaves the team in IDEA_VOTING for regeneration.
+      }
+      ideaStatus = decided;
+      if (anyNo) {
+        teamStatus = isFollowUpApproval ? 'CONTINUATION_VOTING' : team.status;
       } else {
-        await prisma.$transaction([
-          prisma.missionIdea.update({ where: { id: idea.id }, data: { status: 'ACCEPTED' } }),
-          prisma.team.update({ where: { id: team.id }, data: { status: 'CAPTAIN_VOTING' } }),
-        ]);
-        ideaStatus = 'ACCEPTED';
-        teamStatus = 'CAPTAIN_VOTING';
+        teamStatus = isFollowUpApproval ? 'MISSION_ACTIVE' : 'CAPTAIN_VOTING';
       }
     }
 
