@@ -375,6 +375,8 @@ export default function TeamPage() {
   const appeal = team.appeal;
   const appealExpired = appeal ? new Date(appeal.expiresAt).getTime() <= now : false;
   const statusMeta = STATUS_META[team.status] ?? { label: team.status, cls: '' };
+  const missionExpired =
+    team.missionDeadlineAt != null && new Date(team.missionDeadlineAt).getTime() <= now;
 
   return (
     <div className="page team-page">
@@ -675,79 +677,107 @@ export default function TeamPage() {
       )}
 
       {team.status === 'MISSION_ACTIVE' && mission && (
-        <section className="queue-state mission-view">
-          <h2>Mission active</h2>
+        <section className="queue-state mission-workspace">
+          <div className="mw-head">
+            <span className={`status ${missionExpired ? 'status--danger' : 'status--success'}`}>
+              {missionExpired ? 'Deadline passed' : 'Mission active'}
+            </span>
+            <h2 className="mw-title">{mission.title}</h2>
+            <p className="mw-brief">{mission.brief}</p>
+          </div>
+
           {team.missionDeadlineAt && (
-            <p className="timer">
-              ⏳ {formatRemaining(new Date(team.missionDeadlineAt).getTime() - now)} remaining
+            <div className={`mw-timer${missionExpired ? ' mw-timer--over' : ''}`}>
+              <span className="qt-mono">{missionExpired ? 'Deadline' : 'Time remaining'}</span>
+              <p className="timer">
+                {formatRemaining(new Date(team.missionDeadlineAt).getTime() - now)}
+              </p>
+            </div>
+          )}
+
+          {missionExpired && (
+            <p className="form-error">
+              The deadline has passed. Unless a package is submitted, this mission will be marked
+              failed.
             </p>
           )}
-          <h3>{mission.title}</h3>
-          <p>{mission.brief}</p>
 
-          <h3>Deliverables</h3>
-          <ul className="party-members">
+          <h3 className="mw-section-title">Deliverables</h3>
+          <div className="mw-tasks">
             {mission.assignments.map((a, i) => (
-              <li key={i}>
-                <strong>{a.title}</strong> — {a.description}
-                <span className="badge"> · {a.assignedToName}</span>
-              </li>
+              <div className="mw-task" key={i}>
+                <strong>{a.title}</strong>
+                <p>{a.description}</p>
+                <span className="mw-owner">{a.assignedToName}</span>
+              </div>
             ))}
             {/* A follow-up mission starts before owners are assigned. */}
             {mission.assignments.length === 0 &&
               mission.deliverables.map((d, i) => (
-                <li key={i}>
-                  <strong>{d.title}</strong> — {d.description}
-                </li>
+                <div className="mw-task" key={i}>
+                  <strong>{d.title}</strong>
+                  <p>{d.description}</p>
+                </div>
               ))}
-          </ul>
+          </div>
 
-          <h3>Final submission</h3>
-          {isCaptain ? (
-            <div className="submit-form">
-              <label>
-                Summary *
-                <textarea value={submitForm.summary} onChange={setSubmitField('summary')} rows={3} />
-              </label>
-              <label>
-                Pitch
-                <textarea value={submitForm.pitchText} onChange={setSubmitField('pitchText')} rows={2} />
-              </label>
-              <label>
-                Prototype / demo URL
-                <input
-                  value={submitForm.prototypeUrl}
-                  onChange={setSubmitField('prototypeUrl')}
-                  placeholder="https://"
-                />
-              </label>
-              <label>
-                Landing page URL
-                <input
-                  value={submitForm.landingPageUrl}
-                  onChange={setSubmitField('landingPageUrl')}
-                  placeholder="https://"
-                />
-              </label>
-              <label>
-                File / resource links (one per line)
-                <textarea value={submitForm.links} onChange={setSubmitField('links')} rows={2} />
-              </label>
-              <label>
-                Notes
-                <textarea value={submitForm.notes} onChange={setSubmitField('notes')} rows={2} />
-              </label>
-              <button
-                type="button"
-                onClick={submitMission}
-                disabled={busy || !submitForm.summary.trim()}
-              >
-                {busy ? 'Submitting…' : 'Submit final package'}
-              </button>
-            </div>
-          ) : (
-            <p className="placeholder">Your captain will submit the final package.</p>
-          )}
+          <div className="mw-submit">
+            <h3 className="mw-section-title">Final submission</h3>
+            {isCaptain ? (
+              <div className="submit-form">
+                <label>
+                  Summary *
+                  <textarea value={submitForm.summary} onChange={setSubmitField('summary')} rows={3} />
+                </label>
+                <label>
+                  Pitch
+                  <textarea value={submitForm.pitchText} onChange={setSubmitField('pitchText')} rows={2} />
+                </label>
+                <label>
+                  Prototype / demo URL
+                  <input
+                    value={submitForm.prototypeUrl}
+                    onChange={setSubmitField('prototypeUrl')}
+                    placeholder="https://"
+                  />
+                </label>
+                <label>
+                  Landing page URL
+                  <input
+                    value={submitForm.landingPageUrl}
+                    onChange={setSubmitField('landingPageUrl')}
+                    placeholder="https://"
+                  />
+                </label>
+                <label>
+                  File / resource links (one per line)
+                  <textarea value={submitForm.links} onChange={setSubmitField('links')} rows={2} />
+                </label>
+                <label>
+                  Notes
+                  <textarea value={submitForm.notes} onChange={setSubmitField('notes')} rows={2} />
+                </label>
+                <button
+                  type="button"
+                  onClick={submitMission}
+                  disabled={busy || !submitForm.summary.trim()}
+                >
+                  {busy ? 'Submitting…' : 'Submit final package'}
+                </button>
+              </div>
+            ) : (
+              <p className="placeholder">
+                Your captain submits the final package. Get your deliverables done and coordinate
+                in chat before the clock runs out.
+              </p>
+            )}
+          </div>
+
+          <p className="mw-next placeholder">
+            What happens next: when the captain submits, the package enters the anonymized VC
+            review queue. A reviewer scores it across five categories, then your team gets a
+            6-hour appeal window before the score becomes final.
+          </p>
         </section>
       )}
 
