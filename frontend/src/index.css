@@ -2121,6 +2121,110 @@ p.badge {
   margin: 0;
 }
 
+/* How it works ----------------------------------------------------------- */
+
+.hiw-hero {
+  max-width: 720px;
+  padding: 0.5rem 0 0;
+}
+
+.hiw-hero h1 {
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  line-height: 1.1;
+  margin: 1rem 0 0.6rem;
+  background: linear-gradient(180deg, #ffffff, #aab6c9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hiw-hero .lead {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  max-width: 620px;
+}
+
+.hiw-timeline {
+  list-style: none;
+  margin: 2.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  max-width: 760px;
+  position: relative;
+}
+
+.hiw-step {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.15rem 1.3rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--surface), var(--bg));
+  box-shadow: var(--shadow-sm), var(--inner-hi);
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.hiw-step:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.hiw-step__index {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--accent-weak);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.18);
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
+.hiw-step__body h2 {
+  font-size: 1.05rem;
+  margin: 0.3rem 0 0.3rem;
+}
+
+.hiw-step__body p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.hiw-cta {
+  margin-top: 2.75rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border);
+}
+
+.hiw-cta h2 {
+  font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+  margin: 0 0 0.3rem;
+}
+
+@media (max-width: 560px) {
+  .hiw-step {
+    gap: 0.8rem;
+    padding: 1rem;
+  }
+
+  .hiw-step__index {
+    width: 36px;
+    height: 36px;
+  }
+}
+
 /* Motion preference ------------------------------------------------------ */
 
 @media (prefers-reduced-motion: reduce) {
