@@ -46,6 +46,24 @@ const REJECT_REASONS = [
   'Other',
 ];
 
+// Display-only mapping of team status to a header label + status-chip variant.
+const STATUS_META: Record<string, { label: string; cls: string }> = {
+  LOBBY: { label: 'Lobby — ready up', cls: '' },
+  IDEA_VOTING: { label: 'Idea voting', cls: 'status--info' },
+  CAPTAIN_VOTING: { label: 'Captain selection', cls: 'status--info' },
+  MISSION_ACTIVE: { label: 'Mission active', cls: 'status--success' },
+  SUBMITTED: { label: 'Awaiting VC review', cls: 'status--info' },
+  UNDER_REVIEW: { label: 'Under review', cls: 'status--info' },
+  APPEAL_WINDOW: { label: 'Appeal window', cls: 'status--warning' },
+  REVIEW_FINAL: { label: 'Review final', cls: 'status--success' },
+  CONTINUATION_VOTING: { label: 'Continuation vote', cls: 'status--info' },
+  CONTINUING: { label: 'Follow-up mission', cls: 'status--success' },
+  PIVOTING: { label: 'Pivoting', cls: 'status--info' },
+  PUBLISHED: { label: 'Published', cls: 'status--success' },
+  DISBANDED: { label: 'Session ended', cls: '' },
+  FAILED: { label: 'Mission failed', cls: 'status--danger' },
+};
+
 // Formats a remaining duration (ms) as "Dd HH:MM:SS", or "Time's up".
 function formatRemaining(ms: number): string {
   if (ms <= 0) return "Time's up";
@@ -356,17 +374,35 @@ export default function TeamPage() {
     : false;
   const appeal = team.appeal;
   const appealExpired = appeal ? new Date(appeal.expiresAt).getTime() <= now : false;
+  const statusMeta = STATUS_META[team.status] ?? { label: team.status, cls: '' };
 
   return (
-    <div className="page">
-      <h1>Team {inLobby ? 'lobby' : ''}</h1>
+    <div className="page team-page">
+      <header className="team-header">
+        <div>
+          <span className="qt-syslabel">Mission control</span>
+          <h1>Team {inLobby ? 'lobby' : 'workspace'}</h1>
+          <span className={`status ${statusMeta.cls}`}>{statusMeta.label}</span>
+        </div>
+        {(team.status === 'MISSION_ACTIVE' || team.status === 'CONTINUING') &&
+          team.missionDeadlineAt && (
+            <div className="team-header__timer">
+              <span className="qt-mono">Time remaining</span>
+              <p className="timer">
+                {formatRemaining(new Date(team.missionDeadlineAt).getTime() - now)}
+              </p>
+            </div>
+          )}
+      </header>
 
-      {team.matchExplanation && (
-        <p className="placeholder match-explanation">{team.matchExplanation}</p>
-      )}
+      <div className="team-grid">
+        <aside className="team-col team-col--left">
+          {team.matchExplanation && (
+            <p className="placeholder match-explanation">{team.matchExplanation}</p>
+          )}
 
-      <section className="queue-state">
-        <h2>Members ({team.members.length})</h2>
+          <section className="queue-state">
+            <h2>Members ({team.members.length})</h2>
         <ul className="party-members">
           {team.members.map((m) => (
             <li key={m.userId}>
@@ -392,9 +428,11 @@ export default function TeamPage() {
             )}
           </>
         )}
-      </section>
+          </section>
+        </aside>
 
-      {idea &&
+        <main className="team-col team-col--center">
+          {idea &&
         (team.status === 'IDEA_VOTING' ||
           team.status === 'CAPTAIN_VOTING' ||
           team.status === 'CONTINUING') && (
@@ -1031,40 +1069,63 @@ export default function TeamPage() {
         </section>
       )}
 
-      <section className="queue-state chat">
-        <h2>Chat</h2>
-        <div className="chat-log">
-          {messages.length === 0 ? (
-            <p className="placeholder">No messages yet. Say hello to your team.</p>
-          ) : (
-            messages.map((msg) => (
-              <div key={msg.id} className="chat-line">
-                <strong>{msg.displayName}:</strong> {msg.body}
-              </div>
-            ))
+          {error && <p className="form-error">{error}</p>}
+
+          {(inLobby ||
+            team.status === 'REVIEW_FINAL' ||
+            team.status === 'CONTINUATION_VOTING') && (
+            <button type="button" onClick={leaveTeam} disabled={busy} className="link-button">
+              {inLobby ? 'Leave team' : 'Leave team (no penalty)'}
+            </button>
           )}
-          <div ref={chatEndRef} />
-        </div>
-        <form onSubmit={sendMessage} className="chat-form">
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Message your team…"
-            maxLength={2000}
-          />
-          <button type="submit" disabled={!draft.trim()}>
-            Send
-          </button>
-        </form>
-      </section>
+        </main>
 
-      {error && <p className="form-error">{error}</p>}
+        <aside className="team-col team-col--right">
+          <section className="queue-state team-side-card">
+            <h2>Mission status</h2>
+            <span className={`status ${statusMeta.cls}`}>{statusMeta.label}</span>
+            {team.reviewFinal && (
+              <p>
+                <strong>
+                  Final score: {team.finalScore != null ? Math.round(team.finalScore) : '—'}/100
+                </strong>
+              </p>
+            )}
+            {inLobby && (
+              <p className="placeholder">
+                {team.members.filter((m) => m.ready).length} of {team.members.length} ready
+              </p>
+            )}
+          </section>
 
-      {(inLobby || team.status === 'REVIEW_FINAL' || team.status === 'CONTINUATION_VOTING') && (
-        <button type="button" onClick={leaveTeam} disabled={busy} className="link-button">
-          {inLobby ? 'Leave team' : 'Leave team (no penalty)'}
-        </button>
-      )}
+          <section className="queue-state chat">
+            <h2>Chat</h2>
+            <div className="chat-log">
+              {messages.length === 0 ? (
+                <p className="placeholder">No messages yet. Say hello to your team.</p>
+              ) : (
+                messages.map((msg) => (
+                  <div key={msg.id} className="chat-line">
+                    <strong>{msg.displayName}:</strong> {msg.body}
+                  </div>
+                ))
+              )}
+              <div ref={chatEndRef} />
+            </div>
+            <form onSubmit={sendMessage} className="chat-form">
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="Message your team…"
+                maxLength={2000}
+              />
+              <button type="submit" disabled={!draft.trim()}>
+                Send
+              </button>
+            </form>
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }

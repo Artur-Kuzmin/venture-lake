@@ -1577,6 +1577,89 @@ p.badge {
   }
 }
 
+/* Team workspace --------------------------------------------------------- */
+
+.team-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.team-header h1 {
+  margin: 0.4rem 0 0.6rem;
+}
+
+.team-header__timer {
+  text-align: right;
+}
+
+.team-header__timer .qt-mono {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.team-grid {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 320px;
+  gap: 1.25rem;
+  align-items: start;
+  margin-top: 1.5rem;
+}
+
+.team-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.team-col .queue-state {
+  margin-top: 0;
+  max-width: none;
+  width: 100%;
+}
+
+/* Stage panels fade in as the team progresses through statuses. */
+.team-col--center > section {
+  animation: page-in 0.28s ease both;
+}
+
+.team-side-card .status {
+  align-self: flex-start;
+}
+
+.team-col--left .party-members li {
+  transition: color 0.15s ease;
+}
+
+/* Premium workspace chat */
+.team-col--right .chat {
+  max-width: none;
+}
+
+.chat-line {
+  line-height: 1.45;
+}
+
+.chat-line strong {
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+@media (max-width: 1024px) {
+  .team-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .team-header__timer {
+    text-align: left;
+  }
+}
+
 /* Motion preference ------------------------------------------------------ */
 
 @media (prefers-reduced-motion: reduce) {
