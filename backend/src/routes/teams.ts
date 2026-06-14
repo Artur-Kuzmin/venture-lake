@@ -231,16 +231,21 @@ router.get(
 );
 
 // GET /api/teams/:id/messages — lobby chat history (oldest first).
+// Bounded to the most recent MESSAGE_LIMIT messages (fetched newest-first, then
+// reversed) so the 3s poll never returns an unbounded chat log.
+const MESSAGE_LIMIT = 200;
 router.get(
   '/:id/messages',
   asyncHandler(async (req, res) => {
     const userId = req.user!.userId;
     await requireMember(req.params.id, userId);
-    const messages = await prisma.teamMessage.findMany({
+    const recent = await prisma.teamMessage.findMany({
       where: { teamId: req.params.id },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
+      take: MESSAGE_LIMIT,
       include: { user: { select: { id: true, displayName: true } } },
     });
+    const messages = recent.reverse();
     sendData(
       res,
       messages.map((m) => ({

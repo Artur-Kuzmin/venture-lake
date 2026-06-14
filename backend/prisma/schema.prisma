@@ -233,6 +233,7 @@ model TeamMember {
   leftAt   DateTime?
 
   @@unique([teamId, userId])
+  @@index([userId])
 }
 
 model TeamMessage {
@@ -261,6 +262,8 @@ model MissionIdea {
 
   votes    IdeaVote[]
   missions Mission[]
+
+  @@index([teamId])
 }
 
 model IdeaVote {
@@ -318,6 +321,9 @@ model Mission {
 
   deliverableAssignments DeliverableAssignment[]
   submissions            MissionSubmission[]
+
+  @@index([teamId])
+  @@index([status, deadlineAt])
 }
 
 model DeliverableAssignment {
@@ -328,6 +334,8 @@ model DeliverableAssignment {
   description  String
   assignedToId String
   assignedTo   User    @relation(fields: [assignedToId], references: [id])
+
+  @@index([missionId])
 }
 
 model MissionSubmission {
@@ -351,6 +359,9 @@ model MissionSubmission {
   reviews           VCReview[]
   appeals           ReviewAppeal[]
   showcaseProjects  ShowcaseProject[]
+
+  @@index([teamId])
+  @@index([status])
 }
 
 model VCProfile {
@@ -396,6 +407,8 @@ model VCReview {
   createdAt      DateTime           @default(now())
 
   categories VCReviewCategory[]
+
+  @@index([submissionId])
 }
 
 model VCReviewCategory {
@@ -418,6 +431,9 @@ model ReviewAppeal {
   expiresAt    DateTime
 
   votes AppealVote[]
+
+  @@index([submissionId])
+  @@index([status, expiresAt])
 }
 
 model AppealVote {
@@ -459,6 +475,8 @@ model ShowcaseProject {
   publishedAt         DateTime?
 
   attributions ShowcaseAttribution[]
+
+  @@index([isPublic, publishedAt])
 }
 
 model ShowcaseAttribution {

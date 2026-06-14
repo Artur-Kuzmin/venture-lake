@@ -17,6 +17,9 @@ import { requireProfile } from '../middleware/requireProfile.js';
 // or anonymous placeholder identities.
 const router = Router();
 
+// Cap the public showcase list (most recent first) so it stays bounded.
+const SHOWCASE_LIMIT = 60;
+
 // GET /api/showcase — PUBLIC listing of published projects (no auth).
 router.get(
   '/',
@@ -24,6 +27,8 @@ router.get(
     const projects = await prisma.showcaseProject.findMany({
       where: { isPublic: true },
       orderBy: { publishedAt: 'desc' },
+      // Bound the public list to the most recent SHOWCASE_LIMIT projects.
+      take: SHOWCASE_LIMIT,
       include: {
         attributions: {
           where: { visible: true },
