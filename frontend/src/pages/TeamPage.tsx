@@ -151,12 +151,20 @@ export default function TeamPage() {
       .finally(() => {
         if (active) setLoading(false);
       });
+    // Poll while the tab is visible; skip ticks when hidden to reduce load.
     const interval = setInterval(() => {
+      if (document.hidden) return;
       load().catch(toLobbyOn404);
-    }, 3000);
+    }, 5000);
+    // Refresh immediately when the tab becomes visible again.
+    const onVisibility = () => {
+      if (!document.hidden) load().catch(toLobbyOn404);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       active = false;
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [load, navigate]);
 

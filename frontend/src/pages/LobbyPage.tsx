@@ -34,13 +34,20 @@ export default function LobbyPage() {
       .finally(() => {
         if (active) setLoading(false);
       });
-    // Light polling keeps pool stats / queue state fresh.
+    // Light polling keeps pool stats / queue state fresh. Skip ticks while the
+    // tab is hidden to reduce load; refresh on return to the tab.
     const interval = setInterval(() => {
+      if (document.hidden) return;
       load().catch(() => {});
-    }, 5000);
+    }, 8000);
+    const onVisibility = () => {
+      if (!document.hidden) load().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       active = false;
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [load]);
 

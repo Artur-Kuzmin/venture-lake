@@ -73,11 +73,20 @@ app.listen(port, () => {
 
 // Background jobs: auto-fail overdue missions, expire overdue VC reviews, and
 // finalize reviews whose appeal window or appeal vote has lapsed.
+// Enabled by default (so local dev runs them); set RUN_BACKGROUND_JOBS=false to
+// disable on extra instances when horizontally scaling, leaving exactly one
+// process (or a dedicated worker) responsible for them.
 const EXPIRY_INTERVAL_MS = 5 * 60 * 1000;
-setInterval(() => {
-  expireOverdueMissions().catch((err) => console.error('[missionExpiry]', err));
-  expireOverdueReviewAssignments().catch((err) => console.error('[reviewExpiry]', err));
-  expireAppealWindows().catch((err) => console.error('[appealExpiry]', err));
-}, EXPIRY_INTERVAL_MS);
+const backgroundJobsEnabled = process.env.RUN_BACKGROUND_JOBS !== 'false';
+if (backgroundJobsEnabled) {
+  console.log('[venturelake-backend] background expiry jobs ENABLED');
+  setInterval(() => {
+    expireOverdueMissions().catch((err) => console.error('[missionExpiry]', err));
+    expireOverdueReviewAssignments().catch((err) => console.error('[reviewExpiry]', err));
+    expireAppealWindows().catch((err) => console.error('[appealExpiry]', err));
+  }, EXPIRY_INTERVAL_MS);
+} else {
+  console.log('[venturelake-backend] background expiry jobs DISABLED (RUN_BACKGROUND_JOBS=false)');
+}
 
 export default app;
