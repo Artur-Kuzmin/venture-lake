@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/apiClient';
+import { Loading } from '../components/Loading';
 import type { VCAssignmentView, VCMe } from '../types';
 
 const CATEGORIES = [
@@ -128,8 +129,8 @@ export default function VCPage() {
   if (loading) {
     return (
       <div className="page">
-        <h1>VC Reviewer</h1>
-        <p className="placeholder">Loading…</p>
+        <h1>VC Review Desk</h1>
+        <Loading label="Loading the review desk…" />
       </div>
     );
   }
@@ -137,10 +138,13 @@ export default function VCPage() {
   if (!vc?.approved) {
     return (
       <div className="page">
-        <h1>VC Reviewer</h1>
+        <h1>VC Review Desk</h1>
         <div className="queue-state">
-          <p>🔒 VC reviewer mode is locked.</p>
-          <p className="placeholder">An admin must approve your account before you can review.</p>
+          <span className="status status--warning">Locked</span>
+          <h2>VC reviewer mode is locked</h2>
+          <p className="placeholder">
+            An admin must approve your account before you can review submissions.
+          </p>
         </div>
       </div>
     );
@@ -159,13 +163,17 @@ export default function VCPage() {
 
   return (
     <div className="page">
-      <h1>VC Reviewer</h1>
+      <header className="vc-header">
+        <div>
+          <span className="qt-syslabel">Review desk</span>
+          <h1>VC Review Desk</h1>
+        </div>
+        <span className="status status--success">Approved reviewer</span>
+      </header>
 
       {vc.appealedReviews.length > 0 && (
         <div className="queue-state">
-          <p>
-            <strong>⚖️ Appealed reviews</strong>
-          </p>
+          <span className="status status--warning">Appealed reviews</span>
           <ul className="party-members">
             {vc.appealedReviews.map((a) => (
               <li key={a.reviewId}>
@@ -181,7 +189,8 @@ export default function VCPage() {
       {!assignment ? (
         onCooldown ? (
           <div className="queue-state">
-            <p>⏳ You're on a review cooldown.</p>
+            <span className="status status--warning">Cooldown</span>
+            <h2>You're on a review cooldown</h2>
             <p className="placeholder">
               You can re-enter the review queue after{' '}
               <strong>{cooldownUntil!.toLocaleString()}</strong>.
@@ -189,23 +198,28 @@ export default function VCPage() {
           </div>
         ) : (
           <div className="queue-state">
-            <p>
-              <strong>Reviewer mode.</strong> Enter the queue to receive one anonymized submission.
+            <span className="status">Idle</span>
+            <h2>Enter the review queue</h2>
+            <p className="placeholder">
+              Receive one anonymized submission to evaluate. You'll have 6 hours to score it once
+              you accept.
             </p>
             <button type="button" onClick={enterQueue} disabled={busy}>
               {busy ? 'Finding…' : 'Enter review queue'}
             </button>
-            {info && <p className="placeholder">{info}</p>}
             {error && <p className="form-error">{error}</p>}
           </div>
         )
       ) : (
-        <>
-          <div className="queue-state">
-            <h2>Anonymized submission</h2>
-            <h3>{assignment.missionTitle}</h3>
+        <div className="vc-grid">
+          <section className="queue-state vc-submission">
+            <div className="vc-submission__head">
+              <span className="status status--info">Anonymized submission</span>
+            </div>
+            <h2>{assignment.missionTitle}</h2>
             <p className="placeholder">{assignment.missionBrief}</p>
-            <h3>Deliverables</h3>
+
+            <h3 className="mw-section-title">Deliverables</h3>
             <ul className="party-members">
               {assignment.deliverables.map((d, i) => (
                 <li key={i}>
@@ -213,7 +227,8 @@ export default function VCPage() {
                 </li>
               ))}
             </ul>
-            <h3>Submission</h3>
+
+            <h3 className="mw-section-title">Submission</h3>
             <p>
               <strong>Summary:</strong> {assignment.submission.summary}
             </p>
@@ -250,10 +265,14 @@ export default function VCPage() {
                 <strong>Notes:</strong> {assignment.submission.notes}
               </p>
             )}
-          </div>
+          </section>
 
           {assignment.status === 'ASSIGNED' ? (
-            <div className="queue-state">
+            <aside className="queue-state vc-side">
+              <h2>Review assignment</h2>
+              <p className="placeholder">
+                Accept to start your 6-hour review, or pass to return it to the queue.
+              </p>
               <div className="vote-actions">
                 <button type="button" onClick={accept} disabled={busy}>
                   Accept
@@ -263,55 +282,82 @@ export default function VCPage() {
                 </button>
               </div>
               {error && <p className="form-error">{error}</p>}
-            </div>
+            </aside>
           ) : (
-            <div className="queue-state">
-              <h2>Category review</h2>
-              {deadlineMs && (
-                <p className="timer">⏳ {formatRemaining(deadlineMs - now)} left</p>
-              )}
-              {form.map((row, i) => (
-                <div key={row.category} className="review-cat">
-                  <strong>{row.category}</strong>
-                  <label>
-                    Score
-                    <select
-                      value={row.score}
-                      onChange={(e) => updateRow(i, { score: Number(e.target.value) })}
-                    >
-                      {Array.from({ length: 10 }, (_, n) => n + 1).map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <textarea
-                    value={row.feedback}
-                    onChange={(e) => updateRow(i, { feedback: e.target.value })}
-                    rows={2}
-                    placeholder="Short written feedback (min 15 characters)"
-                  />
-                  {row.feedback.length > 0 && !feedbackValid(row.feedback) && (
-                    <span className="placeholder">Feedback is too short or low quality.</span>
+            <aside className="queue-state vc-scorecard">
+              <div className="vc-scorecard__head">
+                <div>
+                  <h2>Scorecard</h2>
+                  {deadlineMs && (
+                    <p className={`timer${expired ? ' vc-timer--over' : ''}`}>
+                      ⏳ {formatRemaining(deadlineMs - now)} left
+                    </p>
                   )}
                 </div>
-              ))}
-              <p>
+                <div
+                  className="vc-ring"
+                  style={{
+                    background: `conic-gradient(var(--accent) ${overallPreview}%, var(--surface-3) 0)`,
+                  }}
+                >
+                  <span className="vc-ring__num">{overallPreview}</span>
+                  <span className="vc-ring__label">/100</span>
+                </div>
+              </div>
+
+              {form.map((row, i) => {
+                const invalid = row.feedback.length > 0 && !feedbackValid(row.feedback);
+                return (
+                  <div key={row.category} className="vc-cat">
+                    <div className="vc-cat__head">
+                      <strong>{row.category}</strong>
+                      <span className="vc-cat__score">{row.score}/10</span>
+                    </div>
+                    <span className="vc-meter">
+                      <i style={{ width: `${row.score * 10}%` }} />
+                    </span>
+                    <label className="vc-cat__score-input">
+                      Score
+                      <select
+                        value={row.score}
+                        onChange={(e) => updateRow(i, { score: Number(e.target.value) })}
+                      >
+                        {Array.from({ length: 10 }, (_, n) => n + 1).map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <textarea
+                      value={row.feedback}
+                      onChange={(e) => updateRow(i, { feedback: e.target.value })}
+                      rows={2}
+                      placeholder="Required feedback (min 15 characters)"
+                      className={invalid ? 'vc-textarea--invalid' : undefined}
+                    />
+                    {invalid ? (
+                      <span className="vc-warn">⚠ Feedback is too short or low quality.</span>
+                    ) : (
+                      row.feedback.length === 0 && (
+                        <span className="placeholder">Feedback is required.</span>
+                      )
+                    )}
+                  </div>
+                );
+              })}
+
+              <p className="vc-overall">
                 Overall score preview: <strong>{overallPreview}/100</strong>
               </p>
-              <button
-                type="button"
-                onClick={submitReview}
-                disabled={busy || !allValid || expired}
-              >
+              <button type="button" onClick={submitReview} disabled={busy || !allValid || expired}>
                 {busy ? 'Submitting…' : 'Submit review'}
               </button>
               {expired && <p className="form-error">The review window has passed.</p>}
               {error && <p className="form-error">{error}</p>}
-            </div>
+            </aside>
           )}
-        </>
+        </div>
       )}
       {info && !assignment && <p className="placeholder">{info}</p>}
     </div>
