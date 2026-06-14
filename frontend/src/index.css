@@ -1947,6 +1947,123 @@ p.badge {
   }
 }
 
+/* Showcase gallery ------------------------------------------------------- */
+
+.sc-hero {
+  max-width: 720px;
+  padding: 0.5rem 0 0;
+}
+
+.sc-hero h1 {
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  line-height: 1.1;
+  margin: 1rem 0 0.6rem;
+  background: linear-gradient(180deg, #ffffff, #aab6c9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.sc-hero .lead {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  max-width: 620px;
+}
+
+.sc-empty {
+  margin-top: 2rem;
+}
+
+.sc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.1rem;
+  margin-top: 2.25rem;
+}
+
+.sc-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1.3rem 1.35rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--surface), var(--bg));
+  box-shadow: var(--shadow-sm), var(--inner-hi);
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.sc-card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+.sc-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sc-score {
+  font-family: var(--mono);
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent-strong);
+}
+
+.sc-score small {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-subtle);
+}
+
+.sc-card__badge {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--success);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  background: var(--success-weak);
+}
+
+.sc-card__title {
+  font-size: 1.15rem;
+  margin: 0.3rem 0 0;
+}
+
+.sc-card__tagline {
+  margin: 0;
+  color: var(--text);
+  font-weight: 550;
+}
+
+.sc-card__pitch {
+  margin: 0;
+  flex: 1;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.sc-card__foot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin-top: 0.5rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+.sc-card__link {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
 /* Motion preference ------------------------------------------------------ */
 
 @media (prefers-reduced-motion: reduce) {
