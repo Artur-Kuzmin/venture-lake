@@ -1,4 +1,4 @@
-import type { FounderProfile, PrimaryRole } from '@prisma/client';
+import type { FounderProfile, PrimaryRole, Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 
 // Automatic matchmaking by SKILL COVERAGE (Foundation Bible, Phase 3.1).
@@ -55,6 +55,10 @@ const ROLE_AREA: Record<PrimaryRole, CoverageArea> = {
 const MIN_TEAM_SIZE = 2;
 const MAX_TEAM_SIZE = 5;
 const MIN_AREAS = 3; // "strong coverage" threshold for sub-5 teams
+
+// Stable, application-wide key for the matchmaking advisory lock. Ensures only
+// one matchmaking run executes at a time across all backend instances.
+const MATCHMAKING_LOCK_KEY = 778899;
 
 interface Member {
   userId: string;
@@ -211,7 +215,13 @@ function buildExplanation(team: Unit[]): string {
 
 // ---- engine --------------------------------------------------------------
 
-async function persistTeam(team: Unit[]): Promise<FormedTeamSummary> {
+// Persists one planned team using the caller's transaction client, so all
+// writes (and the queue read in tryMatchQueue) share the advisory-locked
+// transaction. The matchmaking outcome is unchanged.
+async function persistTeam(
+  tx: Prisma.TransactionClient,
+  team: Unit[]
+): Promise<FormedTeamSummary> {
   const members = membersOf(team);
   const userIds = members.map((m) => m.userId);
   const entryIds = members.map((m) => m.entryId);
@@ -219,25 +229,22 @@ async function persistTeam(team: Unit[]): Promise<FormedTeamSummary> {
   const matchExplanation = buildExplanation(team);
   const coveredAreas = COVERAGE_AREAS.filter((a) => coverageOf(members).has(a));
 
-  const created = await prisma.$transaction(async (tx) => {
-    const createdTeam = await tx.team.create({
-      data: { status: 'LOBBY', matchExplanation },
-    });
-    await tx.teamMember.createMany({
-      data: userIds.map((userId) => ({ teamId: createdTeam.id, userId })),
-    });
-    await tx.queueEntry.updateMany({
-      where: { id: { in: entryIds } },
-      data: { status: 'MATCHED', matchedAt: new Date() },
-    });
-    if (partyIds.length > 0) {
-      await tx.party.updateMany({ where: { id: { in: partyIds } }, data: { status: 'MATCHED' } });
-    }
-    return createdTeam;
+  const createdTeam = await tx.team.create({
+    data: { status: 'LOBBY', matchExplanation },
   });
+  await tx.teamMember.createMany({
+    data: userIds.map((userId) => ({ teamId: createdTeam.id, userId })),
+  });
+  await tx.queueEntry.updateMany({
+    where: { id: { in: entryIds } },
+    data: { status: 'MATCHED', matchedAt: new Date() },
+  });
+  if (partyIds.length > 0) {
+    await tx.party.updateMany({ where: { id: { in: partyIds } }, data: { status: 'MATCHED' } });
+  }
 
   return {
-    teamId: created.id,
+    teamId: createdTeam.id,
     memberUserIds: userIds,
     size: userIds.length,
     coveredAreas,
@@ -251,11 +258,21 @@ async function persistTeam(team: Unit[]): Promise<FormedTeamSummary> {
  * Returns the formed teams and how many users remain queued.
  */
 export async function tryMatchQueue(): Promise<MatchRunResult> {
-  const entries = await prisma.queueEntry.findMany({
-    where: { status: 'QUEUED' },
-    orderBy: { queuedAt: 'asc' },
-    include: { user: { include: { founderProfile: true } } },
-  });
+  // Serialize matchmaking across all backend instances: a transaction-scoped
+  // Postgres advisory lock is acquired before the queue is read, so two
+  // concurrent runs can never plan teams from the same queued entries. The lock
+  // releases automatically when the transaction ends. Matchmaking does only
+  // fast DB + in-memory work (no AI/network), so the lock is held briefly.
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${MATCHMAKING_LOCK_KEY}::bigint)`;
+      console.log('[matchmaking] run start (advisory lock acquired)');
+
+      const entries = await tx.queueEntry.findMany({
+        where: { status: 'QUEUED' },
+        orderBy: { queuedAt: 'asc' },
+        include: { user: { include: { founderProfile: true } } },
+      });
 
   // Group queued entries into indivisible units (party or solo).
   const unitMap = new Map<string, Unit>();
@@ -336,13 +353,21 @@ export async function tryMatchQueue(): Promise<MatchRunResult> {
     // Otherwise leave the seed (and any tentatively considered units) queued.
   }
 
-  const formed: FormedTeamSummary[] = [];
-  for (const team of plannedTeams) {
-    formed.push(await persistTeam(team));
-  }
+      const formed: FormedTeamSummary[] = [];
+      for (const team of plannedTeams) {
+        formed.push(await persistTeam(tx, team));
+      }
 
-  const remainingQueued = await prisma.queueEntry.count({ where: { status: 'QUEUED' } });
-  return { formed, formedCount: formed.length, remainingQueued };
+      const remainingQueued = await tx.queueEntry.count({ where: { status: 'QUEUED' } });
+      console.log(
+        `[matchmaking] run end: formed ${formed.length} team(s), ${remainingQueued} still queued`
+      );
+      return { formed, formedCount: formed.length, remainingQueued };
+    },
+    // Generous bounds: under contention a run waits on the advisory lock inside
+    // the transaction. Fast otherwise (no external calls).
+    { maxWait: 10000, timeout: 30000 }
+  );
 }
 
 export default tryMatchQueue;
