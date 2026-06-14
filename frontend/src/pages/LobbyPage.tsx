@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../lib/apiClient';
 import { PartyPanel } from '../components/PartyPanel';
+import { Loading } from '../components/Loading';
 import type { Party, QueueMe, QueuePoolStats } from '../types';
 
 export default function LobbyPage() {
@@ -87,8 +88,8 @@ export default function LobbyPage() {
   if (loading) {
     return (
       <div className="page">
-        <h1>Lobby</h1>
-        <p className="placeholder">Loading…</p>
+        <h1>Queue Terminal</h1>
+        <Loading label="Connecting to the matchmaking system…" />
       </div>
     );
   }
@@ -98,66 +99,124 @@ export default function LobbyPage() {
   if (!me) {
     return (
       <div className="page">
-        <h1>Lobby</h1>
-        <p className="form-error">{error ?? 'Could not load the lobby.'}</p>
-        <button type="button" onClick={retry}>
-          Try again
-        </button>
+        <h1>Queue Terminal</h1>
+        <div className="queue-state">
+          <p className="form-error">{error ?? 'Could not load the lobby.'}</p>
+          <button type="button" onClick={retry}>
+            Try again
+          </button>
+        </div>
       </div>
     );
   }
 
-  const cooldownUntil = me?.cooldownUntil ? new Date(me.cooldownUntil) : null;
+  const cooldownUntil = me.cooldownUntil ? new Date(me.cooldownUntil) : null;
   const onCooldown = Boolean(cooldownUntil && cooldownUntil.getTime() > Date.now());
-  const isQueued = Boolean(me?.entry);
+  const isQueued = Boolean(me.entry);
+  const matched = Boolean(me.matchedTeamId);
+  const queuedCount = stats?.queuedCount ?? 0;
 
   return (
-    <div className="page">
-      <h1>Lobby</h1>
-
-      {stats && (
+    <div className="page queue-terminal">
+      <header className="qt-header">
+        <span className="qt-syslabel">System // Matchmaking active</span>
+        <h1>Queue Terminal</h1>
         <p className="placeholder">
-          {stats.queuedCount === 0
-            ? 'The queue is empty right now — be the first founder in.'
-            : `${stats.queuedCount} founder${stats.queuedCount === 1 ? '' : 's'} currently in the global queue.`}
+          Join solo or with friends. VentureLake will match you into a balanced founder team.
         </p>
-      )}
+      </header>
 
-      {/* Solo queue controls are hidden while in a party — queue via the party. */}
-      {!party &&
-        (onCooldown ? (
-          <div className="queue-state">
-            <p>
-              You're on cooldown. You can rejoin the queue after{' '}
-              <strong>{cooldownUntil!.toLocaleString()}</strong>.
-            </p>
+      {/* Primary status. Matched first; otherwise the solo status (hidden while
+          in a party — queueing then runs through the party). */}
+      {matched ? (
+        <section className="qt-status qt-status--matched">
+          <div className="qt-status__bar">
+            <span className="qt-chip qt-chip--ok">Match found</span>
+            <span className="qt-mono">DEPLOYING</span>
           </div>
+          <h2>Team assembled — entering your lobby…</h2>
+          <p className="placeholder">Redirecting to your team workspace.</p>
+        </section>
+      ) : !party ? (
+        onCooldown ? (
+          <section className="qt-status qt-status--cooldown">
+            <div className="qt-status__bar">
+              <span className="qt-chip qt-chip--warn">Cooldown</span>
+              <span className="qt-mono">LOCKED</span>
+            </div>
+            <h2>You're on cooldown</h2>
+            <p className="placeholder">
+              You can rejoin the queue after <strong>{cooldownUntil!.toLocaleString()}</strong>.
+            </p>
+          </section>
         ) : isQueued ? (
-          <div className="queue-state">
-            <p>
-              <span className="pulse-dot" aria-hidden="true" />
-              <strong>Searching for a team…</strong> Hang tight — we'll match you on skill coverage.
+          <section className="qt-status qt-status--searching">
+            <span className="qt-scan" aria-hidden="true" />
+            <div className="qt-status__bar">
+              <span className="qt-chip qt-chip--searching">
+                <span className="pulse-dot" aria-hidden="true" />
+                Searching
+              </span>
+              <span className="qt-mono">MATCHING…</span>
+            </div>
+            <h2>Searching for a team…</h2>
+            <p className="placeholder">
+              Hang tight — we're matching you on skill coverage, language, availability, and
+              interests.
             </p>
             <button type="button" onClick={handleLeave} disabled={busy}>
               {busy ? 'Leaving…' : 'Leave Queue'}
             </button>
-          </div>
+          </section>
         ) : (
-          <div className="queue-state">
-            <p>You're not in the queue yet.</p>
+          <section className="qt-status">
+            <div className="qt-status__bar">
+              <span className="qt-chip">Idle</span>
+              <span className="qt-mono">READY</span>
+            </div>
+            <h2>Enter the matchmaking queue</h2>
             <p className="placeholder">
-              Join the global queue and we'll match you into a founder team based on your skills
-              and interests.
+              Join the global queue and we'll place you into a balanced founder team based on your
+              skills and interests.
             </p>
-            <button type="button" onClick={handleJoin} disabled={busy}>
+            <button type="button" className="btn btn--lg" onClick={handleJoin} disabled={busy}>
               {busy ? 'Joining…' : 'Join Queue'}
             </button>
-          </div>
-        ))}
+          </section>
+        )
+      ) : null}
 
       {error && <p className="form-error">{error}</p>}
 
-      <PartyPanel party={party} onChanged={load} />
+      <div className="qt-cols">
+        <PartyPanel party={party} onChanged={load} />
+
+        <aside className="qt-side">
+          <div className="qt-stat">
+            <span className="qt-stat__num">{queuedCount}</span>
+            <span className="qt-stat__label">
+              founder{queuedCount === 1 ? '' : 's'} in the global queue
+            </span>
+            {queuedCount === 0 && (
+              <span className="qt-stat__hint">Queue is warming up — be the first in.</span>
+            )}
+          </div>
+
+          <section className="queue-state">
+            <h2>How matching works</h2>
+            <p className="placeholder">
+              Teams are formed around skill coverage, language compatibility, availability, and
+              interests.
+            </p>
+            <div className="tag-row">
+              <span className="tag">Skill coverage</span>
+              <span className="tag">Language</span>
+              <span className="tag">Availability</span>
+              <span className="tag">Interests</span>
+            </div>
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }

@@ -101,6 +101,7 @@ export function PartyPanel({
 
       {isQueued ? (
         <p>
+          <span className="pulse-dot" aria-hidden="true" />
           <strong>Queued as a party.</strong> Your party will be matched together.
         </p>
       ) : (
