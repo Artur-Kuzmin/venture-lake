@@ -65,16 +65,30 @@ function serializeTeam(team: LoadedTeam, currentUserId: string) {
 // Team detail enriched with the current mission idea (+ visible votes) and the
 // number of rejected ideas so far.
 async function buildTeamDetail(team: LoadedTeam, currentUserId: string) {
-  const idea = await prisma.missionIdea.findFirst({
-    where: { teamId: team.id },
-    orderBy: { createdAt: 'desc' },
-    include: { votes: { include: { user: { select: { id: true, displayName: true } } } } },
-  });
-  // The mission shown is the one belonging to the CURRENT idea round. After a
-  // pivot the previous project's mission is preserved history and must not
-  // resurface as the team's active mission.
-  const [rejectedIdeaCount, mission, submission] = await Promise.all([
+  // Phase 1 (one round-trip): the current idea, the rejected-idea count, and the
+  // latest submission are independent of one another.
+  const [idea, rejectedIdeaCount, submission] = await Promise.all([
+    prisma.missionIdea.findFirst({
+      where: { teamId: team.id },
+      orderBy: { createdAt: 'desc' },
+      include: { votes: { include: { user: { select: { id: true, displayName: true } } } } },
+    }),
     prisma.missionIdea.count({ where: { teamId: team.id, status: 'REJECTED' } }),
+    prisma.missionSubmission.findFirst({
+      where: { teamId: team.id },
+      orderBy: { submittedAt: 'desc' },
+      include: {
+        submittedBy: { select: { displayName: true } },
+        reviewAssignments: { select: { status: true } },
+      },
+    }),
+  ]);
+
+  // Phase 2 (one round-trip): the mission belongs to the CURRENT idea round
+  // (after a pivot the previous project's mission is preserved history and must
+  // not resurface); the reviews and the one-time appeal both key off the
+  // submission. With idea.id and submission.id known, fetch all three together.
+  const [mission, reviews, appealRecord] = await Promise.all([
     idea
       ? prisma.mission.findFirst({
           where: { teamId: team.id, missionIdeaId: idea.id },
@@ -86,14 +100,20 @@ async function buildTeamDetail(team: LoadedTeam, currentUserId: string) {
           },
         })
       : null,
-    prisma.missionSubmission.findFirst({
-      where: { teamId: team.id },
-      orderBy: { submittedAt: 'desc' },
-      include: {
-        submittedBy: { select: { displayName: true } },
-        reviewAssignments: { select: { status: true } },
-      },
-    }),
+    submission
+      ? prisma.vCReview.findMany({
+          where: { submissionId: submission.id },
+          orderBy: { createdAt: 'asc' },
+          include: { vcUser: { select: { displayName: true } }, categories: true },
+        })
+      : [],
+    submission
+      ? prisma.reviewAppeal.findFirst({
+          where: { submissionId: submission.id },
+          orderBy: { createdAt: 'desc' },
+          include: { votes: true },
+        })
+      : null,
   ]);
 
   const deliverables = (mission?.deliverables ?? []) as { title: string; description: string }[];
@@ -108,13 +128,6 @@ async function buildTeamDetail(team: LoadedTeam, currentUserId: string) {
 
   // Completed VC reviews are shown privately to the team (identity + scores +
   // feedback). The appeal window runs 6h from the first review (Phase 8.1).
-  const reviews = submission
-    ? await prisma.vCReview.findMany({
-        where: { submissionId: submission.id },
-        orderBy: { createdAt: 'asc' },
-        include: { vcUser: { select: { displayName: true } }, categories: true },
-      })
-    : [];
   const firstReview = reviews.find((r) => !r.isAppealReview);
   const appealWindowExpiresAt =
     team.status === 'APPEAL_WINDOW' && firstReview
@@ -123,13 +136,6 @@ async function buildTeamDetail(team: LoadedTeam, currentUserId: string) {
 
   // One-time appeal state for the current submission (Phase 8.2), so the team
   // page can render and reload the appeal UI. At most one appeal exists.
-  const appealRecord = submission
-    ? await prisma.reviewAppeal.findFirst({
-        where: { submissionId: submission.id },
-        orderBy: { createdAt: 'desc' },
-        include: { votes: true },
-      })
-    : null;
   const appeal = appealRecord
     ? {
         id: appealRecord.id,
