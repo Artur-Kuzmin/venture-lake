@@ -1,20 +1,26 @@
+import { lazy, Suspense } from 'react';
 import type { ReactNode } from 'react';
 import { Link, NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './lib/authContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AppShell } from './components/AppShell';
 import { Loading } from './components/Loading';
-import HomePage from './pages/HomePage';
-import HowItWorksPage from './pages/HowItWorksPage';
-import SignupPage from './pages/SignupPage';
-import LoginPage from './pages/LoginPage';
-import CreateProfilePage from './pages/CreateProfilePage';
-import ProfilePage from './pages/ProfilePage';
-import LobbyPage from './pages/LobbyPage';
-import TeamPage from './pages/TeamPage';
-import VCPage from './pages/VCPage';
-import ShowcasePage from './pages/ShowcasePage';
-import AdminPage from './pages/AdminPage';
+
+// Route-level code splitting: each page is its own lazy chunk, loaded only when
+// actually rendered. Guards (ProtectedRoute/AuthRoute/redirects) stay eager and
+// run outside the lazy boundary, so unauthenticated users never trigger the
+// authenticated chunks.
+const HomePage = lazy(() => import('./pages/HomePage'));
+const HowItWorksPage = lazy(() => import('./pages/HowItWorksPage'));
+const SignupPage = lazy(() => import('./pages/SignupPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const CreateProfilePage = lazy(() => import('./pages/CreateProfilePage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const LobbyPage = lazy(() => import('./pages/LobbyPage'));
+const TeamPage = lazy(() => import('./pages/TeamPage'));
+const VCPage = lazy(() => import('./pages/VCPage'));
+const ShowcasePage = lazy(() => import('./pages/ShowcasePage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
 
 function PageLoading() {
   return (
@@ -92,7 +98,8 @@ function WildcardRoute() {
 // (guest top-nav vs authenticated sidebar) differs.
 function AppRoutes() {
   return (
-    <Routes>
+    <Suspense fallback={<PageLoading />}>
+      <Routes>
       <Route path="/" element={<RootRoute />} />
       <Route path="/how-it-works" element={<HowItWorksPage />} />
       <Route path="/showcase" element={<ShowcasePage />} />
@@ -160,8 +167,9 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route path="*" element={<WildcardRoute />} />
-    </Routes>
+        <Route path="*" element={<WildcardRoute />} />
+      </Routes>
+    </Suspense>
   );
 }
 

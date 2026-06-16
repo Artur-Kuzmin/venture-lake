@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useReducer, useState } from 'react';
 import { api, ApiError } from '../lib/apiClient';
+import { useAuth } from '../lib/authContext';
 import { Loading } from '../components/Loading';
+import { Countdown } from '../components/Countdown';
 import type { VCAssignmentView, VCMe } from '../types';
 
 const CATEGORIES = [
@@ -40,24 +42,34 @@ function formatRemaining(ms: number): string {
 // VC reviewer mode (Phase 7.1–7.3): locked → enter queue → anonymized submission
 // → accept/pass → category review form (6h window, validity-gated submit).
 export default function VCPage() {
+  // Approval comes from the shared viewer status (no redundant /api/vc/me just
+  // to check approval). Cooldown + appealed-review data still come from
+  // /api/vc/me, fetched only for approved VCs so non-VCs make no requests here.
+  const { isVc, viewerLoading } = useAuth();
   const [vc, setVc] = useState<VCMe | null>(null);
   const [assignment, setAssignment] = useState<VCAssignmentView | null>(null);
   const [form, setForm] = useState<CategoryInput[]>([]);
-  const [now, setNow] = useState(() => Date.now());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [, forceRender] = useReducer((x: number) => x + 1, 0);
 
   const load = useCallback(async () => {
-    const me = await api.get<VCMe>('/api/vc/me');
+    const [me, current] = await Promise.all([
+      api.get<VCMe>('/api/vc/me'),
+      api.get<VCAssignmentView | null>('/api/vc/current-assignment'),
+    ]);
     setVc(me);
-    if (me.approved) {
-      setAssignment(await api.get<VCAssignmentView | null>('/api/vc/current-assignment'));
-    }
+    setAssignment(current);
   }, []);
 
   useEffect(() => {
+    if (viewerLoading) return;
+    if (!isVc) {
+      setLoading(false);
+      return;
+    }
     let active = true;
     load()
       .catch(() => {})
@@ -67,12 +79,7 @@ export default function VCPage() {
     return () => {
       active = false;
     };
-  }, [load]);
-
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
+  }, [isVc, viewerLoading, load]);
 
   // Seed the form once when an assignment becomes accepted.
   useEffect(() => {
@@ -82,6 +89,17 @@ export default function VCPage() {
       setForm([]);
     }
   }, [assignment?.assignmentId, assignment?.status]);
+
+  // Flip the cooldown gate exactly when the cooldown ends — one re-render at the
+  // boundary instead of ticking every second.
+  const cooldownIso = vc?.reviewCooldownUntil ?? null;
+  useEffect(() => {
+    if (!cooldownIso) return;
+    const ms = new Date(cooldownIso).getTime() - Date.now();
+    if (ms <= 0) return;
+    const t = setTimeout(forceRender, ms + 250);
+    return () => clearTimeout(t);
+  }, [cooldownIso]);
 
   async function run(action: () => Promise<unknown>, fallback: string) {
     setError(null);
@@ -126,7 +144,7 @@ export default function VCPage() {
     setForm((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   }
 
-  if (loading) {
+  if (loading || viewerLoading) {
     return (
       <div className="page">
         <h1>VC Review Desk</h1>
@@ -135,7 +153,7 @@ export default function VCPage() {
     );
   }
 
-  if (!vc?.approved) {
+  if (!isVc) {
     return (
       <div className="page">
         <h1>VC Review Desk</h1>
@@ -150,16 +168,17 @@ export default function VCPage() {
     );
   }
 
-  const cooldownUntil = vc.reviewCooldownUntil ? new Date(vc.reviewCooldownUntil) : null;
-  const onCooldown = Boolean(cooldownUntil && cooldownUntil.getTime() > now);
+  const cooldownUntil = vc?.reviewCooldownUntil ? new Date(vc.reviewCooldownUntil) : null;
+  const onCooldown = Boolean(cooldownUntil && cooldownUntil.getTime() > Date.now());
   const deadlineMs = assignment?.deadlineAt ? new Date(assignment.deadlineAt).getTime() : null;
-  const expired = deadlineMs ? deadlineMs <= now : false;
+  const expired = deadlineMs ? deadlineMs <= Date.now() : false;
   const allValid =
     form.length === CATEGORIES.length &&
     form.every((r) => r.score >= 1 && r.score <= 10 && feedbackValid(r.feedback));
   const overallPreview = form.length
     ? Math.round((form.reduce((s, r) => s + r.score, 0) / form.length) * 10)
     : 0;
+  const appealedReviews = vc?.appealedReviews ?? [];
 
   return (
     <div className="page">
@@ -171,11 +190,11 @@ export default function VCPage() {
         <span className="status status--success">Approved reviewer</span>
       </header>
 
-      {vc.appealedReviews.length > 0 && (
+      {appealedReviews.length > 0 && (
         <div className="queue-state">
           <span className="status status--warning">Appealed reviews</span>
           <ul className="party-members">
-            {vc.appealedReviews.map((a) => (
+            {appealedReviews.map((a) => (
               <li key={a.reviewId}>
                 Your review of <strong>{a.missionTitle}</strong> was appealed by the team
                 {a.appealedAt ? ` on ${new Date(a.appealedAt).toLocaleDateString()}` : ''} and sent
@@ -290,7 +309,9 @@ export default function VCPage() {
                   <h2>Scorecard</h2>
                   {deadlineMs && (
                     <p className={`timer${expired ? ' vc-timer--over' : ''}`}>
-                      ⏳ {formatRemaining(deadlineMs - now)} left
+                      ⏳{' '}
+                      <Countdown to={deadlineMs} format={formatRemaining} onExpire={forceRender} />{' '}
+                      left
                     </p>
                   )}
                 </div>

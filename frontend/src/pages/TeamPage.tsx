@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../lib/apiClient';
+import { Countdown } from '../components/Countdown';
 import type {
   CaptainVoteState,
   ContinuationChoice,
@@ -99,7 +100,7 @@ export default function TeamPage() {
   const [rejectReason, setRejectReason] = useState(REJECT_REASONS[0]);
   const [note, setNote] = useState('');
   const [ownerByIndex, setOwnerByIndex] = useState<Record<number, string>>({});
-  const [now, setNow] = useState(() => Date.now());
+  const [, forceRender] = useReducer((x: number) => x + 1, 0);
   const [submitForm, setSubmitForm] = useState({
     summary: '',
     pitchText: '',
@@ -171,12 +172,6 @@ export default function TeamPage() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
-
-  // Tick the mission countdown once a second.
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
 
   // Seed the owner dropdowns from the saved assignments; preserve in-progress
   // edits by only re-seeding when the mission or its assignment set changes.
@@ -381,10 +376,10 @@ export default function TeamPage() {
     ? mission.deliverables.length > 0 && mission.assignments.length === mission.deliverables.length
     : false;
   const appeal = team.appeal;
-  const appealExpired = appeal ? new Date(appeal.expiresAt).getTime() <= now : false;
+  const appealExpired = appeal ? new Date(appeal.expiresAt).getTime() <= Date.now() : false;
   const statusMeta = STATUS_META[team.status] ?? { label: team.status, cls: '' };
   const missionExpired =
-    team.missionDeadlineAt != null && new Date(team.missionDeadlineAt).getTime() <= now;
+    team.missionDeadlineAt != null && new Date(team.missionDeadlineAt).getTime() <= Date.now();
 
   return (
     <div className="page team-page">
@@ -399,7 +394,7 @@ export default function TeamPage() {
             <div className="team-header__timer">
               <span className="qt-mono">Time remaining</span>
               <p className="timer">
-                {formatRemaining(new Date(team.missionDeadlineAt).getTime() - now)}
+                <Countdown to={team.missionDeadlineAt} format={formatRemaining} onExpire={forceRender} />
               </p>
             </div>
           )}
@@ -698,7 +693,7 @@ export default function TeamPage() {
             <div className={`mw-timer${missionExpired ? ' mw-timer--over' : ''}`}>
               <span className="qt-mono">{missionExpired ? 'Deadline' : 'Time remaining'}</span>
               <p className="timer">
-                {formatRemaining(new Date(team.missionDeadlineAt).getTime() - now)}
+                <Countdown to={team.missionDeadlineAt} format={formatRemaining} onExpire={forceRender} />
               </p>
             </div>
           )}
@@ -860,7 +855,7 @@ export default function TeamPage() {
           {team.status === 'APPEAL_WINDOW' && team.appealWindowExpiresAt && (
             <p className="timer">
               ⏳ Appeal window closes in{' '}
-              {formatRemaining(new Date(team.appealWindowExpiresAt).getTime() - now)}
+              <Countdown to={team.appealWindowExpiresAt} format={formatRemaining} />
             </p>
           )}
 
@@ -882,8 +877,8 @@ export default function TeamPage() {
                 <strong>Appeal vote open</strong>
               </p>
               <p className="timer">
-                ⏳ {formatRemaining(new Date(appeal.expiresAt).getTime() - now)} to reach a
-                majority
+                ⏳ <Countdown to={appeal.expiresAt} format={formatRemaining} onExpire={forceRender} />{' '}
+                to reach a majority
               </p>
               <p>
                 YES: {appeal.yesCount} · NO: {appeal.noCount} · Needed: {appeal.majorityNeeded}
