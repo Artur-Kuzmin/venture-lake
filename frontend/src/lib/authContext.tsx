@@ -3,10 +3,12 @@
 // the user object is kept in memory only and re-fetched as needed.
 //
 // It also loads lightweight "viewer status" once authenticated — whether the
-// user has a founder profile, is an approved VC, and is an admin — so routing
-// and nav visibility have a single source of truth.
+// user has a founder profile and is an approved VC — so routing and nav
+// visibility have a single source of truth. Admin status is NOT probed on cold
+// load (non-admins would 403 every load); it is resolved lazily via
+// resolveAdmin() only when an admin route mounts, and cached for the session.
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { api, clearToken, getToken, setToken } from './apiClient';
 import type { FounderProfile, User, VCMe } from '../types';
@@ -14,6 +16,10 @@ import type { FounderProfile, User, VCMe } from '../types';
 interface ViewerStatus {
   hasProfile: boolean;
   isVc: boolean;
+}
+
+interface AdminStatus {
+  resolved: boolean;
   isAdmin: boolean;
 }
 
@@ -25,28 +31,27 @@ interface AuthContextValue {
   viewerLoading: boolean;
   hasProfile: boolean;
   isVc: boolean;
+  // Admin status: resolved lazily (false until resolveAdmin() completes).
   isAdmin: boolean;
+  adminResolved: boolean;
+  resolveAdmin: () => void;
   login: (token: string, user?: User) => void;
   logout: () => void;
   // Re-load viewer status without a token change (e.g. after creating a profile).
   refreshViewer: () => Promise<void>;
 }
 
-const EMPTY_VIEWER: ViewerStatus = { hasProfile: false, isVc: false, isAdmin: false };
+const EMPTY_VIEWER: ViewerStatus = { hasProfile: false, isVc: false };
+const EMPTY_ADMIN: AdminStatus = { resolved: false, isAdmin: false };
 
-// Probe the three status endpoints. Each failure degrades to "no access" so a
-// logged-out/expired token never grants anything. /api/admin/me 403s for
-// non-admins (read as not-admin); /api/vc/me returns approved=false for non-VCs.
+// Probe the two cold-load status endpoints. Each failure degrades to "no
+// access" so a logged-out/expired token never grants anything.
 async function loadViewer(): Promise<ViewerStatus> {
-  const [profile, vc, isAdmin] = await Promise.all([
+  const [profile, vc] = await Promise.all([
     api.get<FounderProfile | null>('/api/profile/me').catch(() => null),
     api.get<VCMe>('/api/vc/me').catch(() => null),
-    api
-      .get('/api/admin/me')
-      .then(() => true)
-      .catch(() => false),
   ]);
-  return { hasProfile: Boolean(profile), isVc: Boolean(vc?.approved), isAdmin };
+  return { hasProfile: Boolean(profile), isVc: Boolean(vc?.approved) };
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -56,6 +61,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [viewer, setViewer] = useState<ViewerStatus>(EMPTY_VIEWER);
   const [viewerLoading, setViewerLoading] = useState<boolean>(() => Boolean(getToken()));
+  const [admin, setAdmin] = useState<AdminStatus>(EMPTY_ADMIN);
+  const adminRef = useRef({ probing: false, resolved: false });
 
   const refreshViewer = useCallback(async () => {
     if (!getToken()) {
@@ -73,9 +80,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Reload viewer status whenever the token changes (login/logout/refresh).
+  // Resolve admin status lazily (once per session). Only callers that actually
+  // need it (admin routes) invoke this, so non-admins never hit /api/admin/me.
+  const resolveAdmin = useCallback(() => {
+    if (!getToken() || adminRef.current.probing || adminRef.current.resolved) return;
+    adminRef.current.probing = true;
+    api
+      .get('/api/admin/me')
+      .then(() => {
+        adminRef.current.resolved = true;
+        setAdmin({ resolved: true, isAdmin: true });
+      })
+      .catch(() => {
+        adminRef.current.resolved = true;
+        setAdmin({ resolved: true, isAdmin: false });
+      })
+      .finally(() => {
+        adminRef.current.probing = false;
+      });
+  }, []);
+
+  // Reload viewer status (and reset lazily-resolved admin status) whenever the
+  // token changes (login/logout/refresh).
   useEffect(() => {
     let active = true;
+    setAdmin(EMPTY_ADMIN);
+    adminRef.current = { probing: false, resolved: false };
     if (!token) {
       setViewer(EMPTY_VIEWER);
       setViewerLoading(false);
@@ -105,7 +135,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       viewerLoading,
       hasProfile: viewer.hasProfile,
       isVc: viewer.isVc,
-      isAdmin: viewer.isAdmin,
+      isAdmin: admin.isAdmin,
+      adminResolved: admin.resolved,
+      resolveAdmin,
       login: (newToken: string, newUser?: User) => {
         setToken(newToken);
         setTokenState(newToken);
@@ -116,10 +148,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTokenState(null);
         setUser(null);
         setViewer(EMPTY_VIEWER);
+        setAdmin(EMPTY_ADMIN);
       },
       refreshViewer,
     }),
-    [token, user, viewer, viewerLoading, refreshViewer]
+    [token, user, viewer, viewerLoading, admin, resolveAdmin, refreshViewer]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

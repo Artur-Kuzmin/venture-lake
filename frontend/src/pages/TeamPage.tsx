@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { mutate as globalMutate } from 'swr';
 import { api, ApiError } from '../lib/apiClient';
+import { useApi } from '../lib/swr';
 import { Countdown } from '../components/Countdown';
 import type {
   CaptainVoteState,
@@ -81,19 +83,42 @@ function formatRemaining(ms: number): string {
 export default function TeamPage() {
   const { teamId } = useParams();
   const navigate = useNavigate();
-  const [team, setTeam] = useState<TeamDetail | null>(null);
-  const [captainVote, setCaptainVote] = useState<CaptainVoteState | null>(null);
-  const [continuation, setContinuation] = useState<ContinuationState | null>(null);
-  const [showcase, setShowcase] = useState<ShowcaseTeamState | null>(null);
+  // Team state machine via the shared SWR cache: deduped, cached across
+  // navigations, polled every 5s (refreshInterval pauses while the tab is
+  // hidden). A short dedupingInterval + revalidateOnFocus keeps the fast-moving
+  // status fresh. Sub-views are fetched only in the statuses that use them.
+  const {
+    data: team,
+    error: teamError,
+    isLoading: teamLoading,
+  } = useApi<TeamDetail>(teamId ? `/api/teams/${teamId}` : null, {
+    refreshInterval: 5000,
+    revalidateOnFocus: true,
+    dedupingInterval: 1500,
+  });
+  const { data: messages = [], mutate: mutateMessages } = useApi<TeamMessageView[]>(
+    teamId ? `/api/teams/${teamId}/messages` : null,
+    { refreshInterval: 5000 }
+  );
+  const { data: captainVote = null } = useApi<CaptainVoteState>(
+    team?.status === 'CAPTAIN_VOTING' && teamId ? `/api/teams/${teamId}/captain-vote` : null,
+    { refreshInterval: 5000 }
+  );
+  const { data: continuation = null } = useApi<ContinuationState>(
+    team?.status === 'CONTINUATION_VOTING' && teamId ? `/api/teams/${teamId}/continuation` : null,
+    { refreshInterval: 5000 }
+  );
+  const { data: showcase = null } = useApi<ShowcaseTeamState | null>(
+    team?.status === 'PUBLISHED' && teamId ? `/api/showcase/team/${teamId}` : null,
+    { refreshInterval: 5000 }
+  );
   const [publishForm, setPublishForm] = useState({
     title: '',
     tagline: '',
     shortPitch: '',
     prototypeUrl: '',
   });
-  const [messages, setMessages] = useState<TeamMessageView[]>([]);
   const [draft, setDraft] = useState('');
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [noMode, setNoMode] = useState(false);
@@ -111,63 +136,26 @@ export default function TeamPage() {
   });
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
-  const load = useCallback(async () => {
+  // Revalidate every team-scoped key after an action. The backend remains the
+  // source of truth; this only refreshes the shared cache.
+  const revalidate = useCallback(async () => {
     if (!teamId) return;
-    const [teamRes, messagesRes] = await Promise.all([
-      api.get<TeamDetail>(`/api/teams/${teamId}`),
-      api.get<TeamMessageView[]>(`/api/teams/${teamId}/messages`),
+    await Promise.all([
+      globalMutate(`/api/teams/${teamId}`),
+      globalMutate(`/api/teams/${teamId}/messages`),
+      globalMutate(`/api/teams/${teamId}/captain-vote`),
+      globalMutate(`/api/teams/${teamId}/continuation`),
+      globalMutate(`/api/showcase/team/${teamId}`),
     ]);
-    setTeam(teamRes);
-    setMessages(messagesRes);
-    if (teamRes.status === 'CAPTAIN_VOTING') {
-      setCaptainVote(await api.get<CaptainVoteState>(`/api/teams/${teamId}/captain-vote`));
-    } else {
-      setCaptainVote(null);
-    }
-    if (teamRes.status === 'CONTINUATION_VOTING') {
-      setContinuation(await api.get<ContinuationState>(`/api/teams/${teamId}/continuation`));
-    } else {
-      setContinuation(null);
-    }
-    if (teamRes.status === 'PUBLISHED') {
-      setShowcase(await api.get<ShowcaseTeamState | null>(`/api/showcase/team/${teamId}`));
-    } else {
-      setShowcase(null);
-    }
   }, [teamId]);
 
+  // A team that 403s/404s (you left, it disbanded, not a member) returns you to
+  // the lobby — same behavior as the previous poll's error handling.
   useEffect(() => {
-    let active = true;
-    const toLobbyOn404 = (err: unknown) => {
-      if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
-        navigate('/lobby');
-        return true;
-      }
-      return false;
-    };
-    load()
-      .catch((err) => {
-        if (!toLobbyOn404(err) && active) setError('Could not load the team.');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    // Poll while the tab is visible; skip ticks when hidden to reduce load.
-    const interval = setInterval(() => {
-      if (document.hidden) return;
-      load().catch(toLobbyOn404);
-    }, 5000);
-    // Refresh immediately when the tab becomes visible again.
-    const onVisibility = () => {
-      if (!document.hidden) load().catch(toLobbyOn404);
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      active = false;
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, [load, navigate]);
+    if (teamError instanceof ApiError && (teamError.status === 403 || teamError.status === 404)) {
+      navigate('/lobby');
+    }
+  }, [teamError, navigate]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -195,7 +183,7 @@ export default function TeamPage() {
     setBusy(true);
     try {
       await action();
-      await load();
+      await revalidate();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : fallback);
     } finally {
@@ -313,7 +301,7 @@ export default function TeamPage() {
     setDraft('');
     try {
       const msg = await api.post<TeamMessageView>(`/api/teams/${teamId}/messages`, { body });
-      setMessages((prev) => [...prev, msg]);
+      await mutateMessages((cur) => [...(cur ?? []), msg], { revalidate: false });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not send message.');
       setDraft(body);
@@ -342,7 +330,7 @@ export default function TeamPage() {
       });
   }
 
-  if (loading) {
+  if (teamLoading && !team) {
     return (
       <div className="page">
         <h1>Team</h1>
@@ -354,7 +342,9 @@ export default function TeamPage() {
     return (
       <div className="page">
         <h1>Team</h1>
-        <p className="form-error">{error ?? 'Team unavailable.'}</p>
+        <p className="form-error">
+          {teamError instanceof ApiError ? teamError.message : 'Team unavailable.'}
+        </p>
       </div>
     );
   }

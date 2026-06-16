@@ -1,55 +1,30 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { mutate as globalMutate } from 'swr';
 import { api, ApiError } from '../lib/apiClient';
+import { useApi } from '../lib/swr';
 import { PartyPanel } from '../components/PartyPanel';
 import { Loading } from '../components/Loading';
 import type { Party, QueueMe, QueuePoolStats } from '../types';
 
 export default function LobbyPage() {
   const navigate = useNavigate();
-  const [me, setMe] = useState<QueueMe | null>(null);
-  const [stats, setStats] = useState<QueuePoolStats | null>(null);
-  const [party, setParty] = useState<Party | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Queue/party state via the shared SWR cache: deduped, cached across
+  // navigations, polled every 8s (refreshInterval pauses while the tab is
+  // hidden). Revisiting from cache shows content instantly.
+  const { data: me, error: meError, isLoading } = useApi<QueueMe>('/api/queue/me', {
+    refreshInterval: 8000,
+  });
+  const { data: stats } = useApi<QueuePoolStats>('/api/queue/status', { refreshInterval: 8000 });
+  const { data: party } = useApi<Party | null>('/api/party/me', { refreshInterval: 8000 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    const [meRes, statsRes, partyRes] = await Promise.all([
-      api.get<QueueMe>('/api/queue/me'),
-      api.get<QueuePoolStats>('/api/queue/status'),
-      api.get<Party | null>('/api/party/me'),
-    ]);
-    setMe(meRes);
-    setStats(statsRes);
-    setParty(partyRes);
+  const refresh = useCallback(() => {
+    globalMutate('/api/queue/me');
+    globalMutate('/api/queue/status');
+    globalMutate('/api/party/me');
   }, []);
-
-  useEffect(() => {
-    let active = true;
-    load()
-      .catch(() => {
-        if (active) setError('Could not load the lobby. Check your connection and try again.');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    // Light polling keeps pool stats / queue state fresh. Skip ticks while the
-    // tab is hidden to reduce load; refresh on return to the tab.
-    const interval = setInterval(() => {
-      if (document.hidden) return;
-      load().catch(() => {});
-    }, 8000);
-    const onVisibility = () => {
-      if (!document.hidden) load().catch(() => {});
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      active = false;
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, [load]);
 
   // Once matched, send the user to their team lobby.
   useEffect(() => {
@@ -63,7 +38,7 @@ export default function LobbyPage() {
     setBusy(true);
     try {
       await api.post('/api/queue/join');
-      await load();
+      refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not join the queue.');
     } finally {
@@ -76,7 +51,7 @@ export default function LobbyPage() {
     setBusy(true);
     try {
       await api.post('/api/queue/leave');
-      await load();
+      refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not leave the queue.');
     } finally {
@@ -84,15 +59,7 @@ export default function LobbyPage() {
     }
   }
 
-  function retry() {
-    setError(null);
-    setLoading(true);
-    load()
-      .catch(() => setError('Could not load the lobby. Check your connection and try again.'))
-      .finally(() => setLoading(false));
-  }
-
-  if (loading) {
+  if (isLoading && !me) {
     return (
       <div className="page">
         <h1>Queue Terminal</h1>
@@ -108,8 +75,10 @@ export default function LobbyPage() {
       <div className="page">
         <h1>Queue Terminal</h1>
         <div className="queue-state">
-          <p className="form-error">{error ?? 'Could not load the lobby.'}</p>
-          <button type="button" onClick={retry}>
+          <p className="form-error">
+            {meError instanceof ApiError ? meError.message : 'Could not load the lobby.'}
+          </p>
+          <button type="button" onClick={() => globalMutate('/api/queue/me')}>
             Try again
           </button>
         </div>
@@ -196,7 +165,7 @@ export default function LobbyPage() {
       {error && <p className="form-error">{error}</p>}
 
       <div className="qt-cols">
-        <PartyPanel party={party} onChanged={load} />
+        <PartyPanel party={party ?? null} onChanged={refresh} />
 
         <aside className="qt-side">
           <div className="qt-stat">
