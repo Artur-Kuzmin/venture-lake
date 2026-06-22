@@ -6,6 +6,7 @@ import { api, ApiError } from '../lib/apiClient';
 import { useApi } from '../lib/swr';
 import { Countdown } from '../components/Countdown';
 import { TeamSkeleton } from '../components/PageSkeletons';
+import { Tooltip } from '../components/Tooltip';
 import type {
   CaptainVoteState,
   ContinuationChoice,
@@ -1277,9 +1278,27 @@ export default function TeamPage() {
                 placeholder="Message your team…"
                 maxLength={2000}
               />
-              <button type="submit" disabled={!draft.trim()}>
-                Send
-              </button>
+              <Tooltip label="Send message">
+                <button
+                  type="submit"
+                  className="icon-btn icon-btn--primary"
+                  disabled={!draft.trim()}
+                  aria-label="Send message"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="m22 2-7 20-4-9-9-4Z" />
+                    <path d="M22 2 11 13" />
+                  </svg>
+                </button>
+              </Tooltip>
             </form>
           </section>
         </aside>
