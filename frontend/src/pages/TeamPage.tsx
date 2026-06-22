@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { mutate as globalMutate } from 'swr';
+import type { KeyedMutator } from 'swr';
 import { api, ApiError } from '../lib/apiClient';
 import { useApi } from '../lib/swr';
 import { Countdown } from '../components/Countdown';
@@ -80,6 +81,29 @@ function formatRemaining(ms: number): string {
   return `${days}d ${pad(h)}:${pad(m)}:${pad(sec)}`;
 }
 
+// Optimistic local update for an idea vote: shows YOUR OWN vote in the votes
+// list immediately. It never touches idea.status, so no ACCEPTED/REJECTED
+// transition is implied — that stays server-confirmed.
+function optimisticIdeaVote(
+  cur: TeamDetail | undefined,
+  vote: 'YES' | 'NO',
+  rejectReason: string | null = null,
+  feedbackNote: string | null = null
+): TeamDetail | undefined {
+  if (!cur?.currentIdea) return cur;
+  const meId = cur.currentUserId;
+  const myName = cur.members.find((m) => m.userId === meId)?.displayName ?? 'You';
+  const others = cur.currentIdea.votes.filter((v) => v.userId !== meId);
+  const mine = {
+    userId: meId,
+    displayName: myName,
+    vote,
+    rejectReason: vote === 'NO' ? rejectReason : null,
+    feedbackNote,
+  };
+  return { ...cur, currentIdea: { ...cur.currentIdea, votes: [...others, mine] } };
+}
+
 // Team lobby + idea voting. Backend enforces membership and all transitions.
 export default function TeamPage() {
   const { teamId } = useParams();
@@ -92,6 +116,7 @@ export default function TeamPage() {
     data: team,
     error: teamError,
     isLoading: teamLoading,
+    mutate: mutateTeam,
   } = useApi<TeamDetail>(teamId ? `/api/teams/${teamId}` : null, {
     refreshInterval: 5000,
     revalidateOnFocus: true,
@@ -101,11 +126,11 @@ export default function TeamPage() {
     teamId ? `/api/teams/${teamId}/messages` : null,
     { refreshInterval: 5000 }
   );
-  const { data: captainVote = null } = useApi<CaptainVoteState>(
+  const { data: captainVote = null, mutate: mutateCaptainVote } = useApi<CaptainVoteState>(
     team?.status === 'CAPTAIN_VOTING' && teamId ? `/api/teams/${teamId}/captain-vote` : null,
     { refreshInterval: 5000 }
   );
-  const { data: continuation = null } = useApi<ContinuationState>(
+  const { data: continuation = null, mutate: mutateContinuation } = useApi<ContinuationState>(
     team?.status === 'CONTINUATION_VOTING' && teamId ? `/api/teams/${teamId}/continuation` : null,
     { refreshInterval: 5000 }
   );
@@ -120,6 +145,8 @@ export default function TeamPage() {
     prototypeUrl: '',
   });
   const [draft, setDraft] = useState('');
+  // Temp ids of chat messages whose POST is still in flight (shown as "sending").
+  const [pending, setPending] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [noMode, setNoMode] = useState(false);
@@ -192,8 +219,44 @@ export default function TeamPage() {
     }
   }
 
+  // Optimistic update for low-risk actions: write the expected local change to
+  // the cache now, then POST. On success revalidate to reconcile with the
+  // server; on failure revalidate too — which rolls back to the true state,
+  // since the rejected change was never persisted — and surface a brief error.
+  // Used ONLY for your own action's local appearance, never for a server
+  // state transition.
+  async function optimistic<T>(
+    mutateKey: KeyedMutator<T>,
+    patch: (cur: T | undefined) => T | undefined,
+    action: () => Promise<unknown>,
+    fallback: string
+  ) {
+    setError(null);
+    void mutateKey(patch, { revalidate: false });
+    try {
+      await action();
+      await mutateKey();
+    } catch (err) {
+      await mutateKey();
+      setError(err instanceof ApiError ? err.message : fallback);
+    }
+  }
+
   const toggleReady = () =>
-    run(() => api.post(`/api/teams/${teamId}/ready`), 'Could not update ready status.');
+    optimistic(
+      mutateTeam,
+      (cur) =>
+        cur
+          ? {
+              ...cur,
+              members: cur.members.map((m) =>
+                m.userId === cur.currentUserId ? { ...m, ready: !m.ready } : m
+              ),
+            }
+          : cur,
+      () => api.post(`/api/teams/${teamId}/ready`),
+      'Could not update ready status.'
+    );
   const generateIdea = () =>
     run(() => api.post(`/api/teams/${teamId}/generate-idea`), 'Could not generate an idea.');
   const regenerate = () =>
@@ -201,7 +264,24 @@ export default function TeamPage() {
   const nominateCaptain = () =>
     run(() => api.post(`/api/teams/${teamId}/captain/nominate`), 'Could not self-nominate.');
   const voteCaptain = (candidateId: string) =>
-    run(() => api.post(`/api/teams/${teamId}/captain/vote`, { candidateId }), 'Could not vote.');
+    optimistic(
+      mutateCaptainVote,
+      (cur) =>
+        cur
+          ? {
+              ...cur,
+              myVote: candidateId,
+              nominees: cur.nominees.map((n) => {
+                let votes = n.votes;
+                if (cur.myVote === n.userId) votes -= 1;
+                if (n.userId === candidateId) votes += 1;
+                return { ...n, votes };
+              }),
+            }
+          : cur,
+      () => api.post(`/api/teams/${teamId}/captain/vote`, { candidateId }),
+      'Could not vote.'
+    );
   const generateDeliverables = () =>
     run(() => api.post(`/api/teams/${teamId}/generate-deliverables`), 'Could not generate deliverables.');
   const saveAssignments = () =>
@@ -270,7 +350,20 @@ export default function TeamPage() {
       'Could not start the appeal.'
     );
   const voteAppeal = (vote: 'YES' | 'NO') =>
-    run(
+    optimistic(
+      mutateTeam,
+      (cur) => {
+        if (!cur?.appeal) return cur;
+        const a = cur.appeal;
+        let yesCount = a.yesCount;
+        let noCount = a.noCount;
+        if (a.myVote === 'YES') yesCount -= 1;
+        if (a.myVote === 'NO') noCount -= 1;
+        if (vote === 'YES') yesCount += 1;
+        else noCount += 1;
+        // myVote + counts only — appeal.status stays server-confirmed.
+        return { ...cur, appeal: { ...a, myVote: vote, yesCount, noCount } };
+      },
       () => api.post(`/api/appeals/${team!.appeal!.id}/vote`, { vote }),
       'Could not vote on the appeal.'
     );
@@ -278,34 +371,77 @@ export default function TeamPage() {
   const startContinuationVote = () =>
     run(() => api.post(`/api/teams/${teamId}/continuation/start`), 'Could not start the vote.');
   const voteContinuation = (choice: ContinuationChoice) =>
-    run(() => api.post(`/api/teams/${teamId}/continuation/vote`, { choice }), 'Could not vote.');
+    optimistic(
+      mutateContinuation,
+      (cur) =>
+        cur
+          ? {
+              ...cur,
+              myChoice: choice,
+              tallies: cur.tallies.map((t) => {
+                let votes = t.votes;
+                if (cur.myChoice === t.choice) votes -= 1;
+                if (t.choice === choice) votes += 1;
+                return { ...t, votes };
+              }),
+            }
+          : cur,
+      () => api.post(`/api/teams/${teamId}/continuation/vote`, { choice }),
+      'Could not vote.'
+    );
 
   function voteYes(ideaId: string) {
-    return run(() => api.post(`/api/mission-ideas/${ideaId}/vote`, { vote: 'YES' }), 'Could not vote.');
+    return optimistic(
+      mutateTeam,
+      (cur) => optimisticIdeaVote(cur, 'YES'),
+      () => api.post(`/api/mission-ideas/${ideaId}/vote`, { vote: 'YES' }),
+      'Could not vote.'
+    );
   }
   function voteNo(ideaId: string) {
-    return run(async () => {
-      await api.post(`/api/mission-ideas/${ideaId}/vote`, {
-        vote: 'NO',
-        rejectReason,
-        feedbackNote: note.trim() || undefined,
-      });
-      setNoMode(false);
-      setNote('');
-    }, 'Could not vote.');
+    const reason = rejectReason;
+    const fb = note.trim() || null;
+    return optimistic(
+      mutateTeam,
+      (cur) => optimisticIdeaVote(cur, 'NO', reason, fb),
+      async () => {
+        await api.post(`/api/mission-ideas/${ideaId}/vote`, {
+          vote: 'NO',
+          rejectReason: reason,
+          feedbackNote: note.trim() || undefined,
+        });
+        setNoMode(false);
+        setNote('');
+      },
+      'Could not vote.'
+    );
   }
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
     const body = draft.trim();
-    if (!body) return;
+    if (!body || !team) return;
     setDraft('');
+    // Show the message immediately as "sending"; reconcile on confirm/fail.
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const optimisticMsg: TeamMessageView = {
+      id: tempId,
+      userId: team.currentUserId,
+      displayName: team.members.find((m) => m.userId === team.currentUserId)?.displayName ?? 'You',
+      body,
+      createdAt: new Date().toISOString(),
+    };
+    setPending((p) => [...p, tempId]);
+    void mutateMessages((cur) => [...(cur ?? []), optimisticMsg], { revalidate: false });
     try {
-      const msg = await api.post<TeamMessageView>(`/api/teams/${teamId}/messages`, { body });
-      await mutateMessages((cur) => [...(cur ?? []), msg], { revalidate: false });
+      await api.post<TeamMessageView>(`/api/teams/${teamId}/messages`, { body });
+      await mutateMessages(); // confirmed — server list replaces the temp message
     } catch (err) {
+      await mutateMessages(); // failed — roll back to the server's real list
       setError(err instanceof ApiError ? err.message : 'Could not send message.');
       setDraft(body);
+    } finally {
+      setPending((p) => p.filter((id) => id !== tempId));
     }
   }
 
@@ -1126,6 +1262,9 @@ export default function TeamPage() {
                 messages.map((msg) => (
                   <div key={msg.id} className="chat-line">
                     <strong>{msg.displayName}:</strong> {msg.body}
+                    {pending.includes(msg.id) && (
+                      <span className="placeholder"> · sending…</span>
+                    )}
                   </div>
                 ))
               )}

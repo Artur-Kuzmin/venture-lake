@@ -5,16 +5,29 @@ import { api, ApiError } from '../lib/apiClient';
 import { useApi } from '../lib/swr';
 import { PartyPanel } from '../components/PartyPanel';
 import { LobbySkeleton } from '../components/PageSkeletons';
-import type { Party, QueueMe, QueuePoolStats } from '../types';
+import type { Party, QueueEntry, QueueMe, QueuePoolStats } from '../types';
+
+// Placeholder queue entry for the optimistic "joined" state. Only its
+// truthiness drives the queued UI; the real entry replaces it on revalidate.
+const OPTIMISTIC_ENTRY: QueueEntry = {
+  id: 'optimistic',
+  userId: '',
+  partyId: null,
+  status: 'QUEUED',
+  queuedAt: new Date().toISOString(),
+  matchedAt: null,
+  cooldownUntil: null,
+};
 
 export default function LobbyPage() {
   const navigate = useNavigate();
   // Queue/party state via the shared SWR cache: deduped, cached across
   // navigations, polled every 8s (refreshInterval pauses while the tab is
   // hidden). Revisiting from cache shows content instantly.
-  const { data: me, error: meError, isLoading } = useApi<QueueMe>('/api/queue/me', {
-    refreshInterval: 8000,
-  });
+  const { data: me, error: meError, isLoading, mutate: mutateMe } = useApi<QueueMe>(
+    '/api/queue/me',
+    { refreshInterval: 8000 }
+  );
   const { data: stats } = useApi<QueuePoolStats>('/api/queue/status', { refreshInterval: 8000 });
   const { data: party } = useApi<Party | null>('/api/party/me', { refreshInterval: 8000 });
   const [busy, setBusy] = useState(false);
@@ -36,10 +49,13 @@ export default function LobbyPage() {
   async function handleJoin() {
     setError(null);
     setBusy(true);
+    // Optimistically show "searching"; reconcile (or roll back) on response.
+    void mutateMe((cur) => (cur ? { ...cur, entry: OPTIMISTIC_ENTRY } : cur), { revalidate: false });
     try {
       await api.post('/api/queue/join');
       refresh();
     } catch (err) {
+      await mutateMe(); // roll back to the true queue state
       setError(err instanceof ApiError ? err.message : 'Could not join the queue.');
     } finally {
       setBusy(false);
@@ -49,10 +65,13 @@ export default function LobbyPage() {
   async function handleLeave() {
     setError(null);
     setBusy(true);
+    // Optimistically clear the queue entry; reconcile (or roll back) on response.
+    void mutateMe((cur) => (cur ? { ...cur, entry: null } : cur), { revalidate: false });
     try {
       await api.post('/api/queue/leave');
       refresh();
     } catch (err) {
+      await mutateMe(); // roll back to the true queue state
       setError(err instanceof ApiError ? err.message : 'Could not leave the queue.');
     } finally {
       setBusy(false);
