@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/apiClient';
-import { Loading } from '../components/Loading';
+import { ShowcaseSkeleton } from '../components/PageSkeletons';
 import type { PublicShowcaseProject } from '../types';
 
 // Public showcase (Phase 10): published projects only — name, tagline, short
@@ -30,7 +30,7 @@ export default function ShowcasePage() {
       </section>
 
       {error && <p className="form-error">{error}</p>}
-      {!error && !projects && <Loading label="Loading the showcase…" />}
+      {!error && !projects && <ShowcaseSkeleton />}
 
       {projects && projects.length === 0 && (
         <div className="queue-state sc-empty">

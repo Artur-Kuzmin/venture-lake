@@ -4,6 +4,7 @@ import { mutate as globalMutate } from 'swr';
 import { api, ApiError } from '../lib/apiClient';
 import { useApi } from '../lib/swr';
 import { Countdown } from '../components/Countdown';
+import { TeamSkeleton } from '../components/PageSkeletons';
 import type {
   CaptainVoteState,
   ContinuationChoice,
@@ -331,12 +332,7 @@ export default function TeamPage() {
   }
 
   if (teamLoading && !team) {
-    return (
-      <div className="page">
-        <h1>Team</h1>
-        <p className="placeholder">Loading…</p>
-      </div>
-    );
+    return <TeamSkeleton />;
   }
   if (!team) {
     return (

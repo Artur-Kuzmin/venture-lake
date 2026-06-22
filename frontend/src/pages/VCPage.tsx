@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useState } from 'react';
 import { api, ApiError } from '../lib/apiClient';
 import { useAuth } from '../lib/authContext';
-import { Loading } from '../components/Loading';
+import { VCSkeleton } from '../components/PageSkeletons';
 import { Countdown } from '../components/Countdown';
 import type { VCAssignmentView, VCMe } from '../types';
 
@@ -145,12 +145,7 @@ export default function VCPage() {
   }
 
   if (loading || viewerLoading) {
-    return (
-      <div className="page">
-        <h1>VC Review Desk</h1>
-        <Loading label="Loading the review desk…" />
-      </div>
-    );
+    return <VCSkeleton />;
   }
 
   if (!isVc) {

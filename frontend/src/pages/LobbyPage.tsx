@@ -4,7 +4,7 @@ import { mutate as globalMutate } from 'swr';
 import { api, ApiError } from '../lib/apiClient';
 import { useApi } from '../lib/swr';
 import { PartyPanel } from '../components/PartyPanel';
-import { Loading } from '../components/Loading';
+import { LobbySkeleton } from '../components/PageSkeletons';
 import type { Party, QueueMe, QueuePoolStats } from '../types';
 
 export default function LobbyPage() {
@@ -60,12 +60,7 @@ export default function LobbyPage() {
   }
 
   if (isLoading && !me) {
-    return (
-      <div className="page">
-        <h1>Queue Terminal</h1>
-        <Loading label="Connecting to the matchmaking system…" />
-      </div>
-    );
+    return <LobbySkeleton />;
   }
 
   // Initial load failed — show a clear error with a retry instead of an

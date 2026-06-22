@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/apiClient';
 import { useAuth } from '../lib/authContext';
 import { ProfileForm } from '../components/ProfileForm';
-import { Loading } from '../components/Loading';
+import { ProfileSkeleton } from '../components/PageSkeletons';
 import type { FounderProfile, PrimaryRole, ProfileInput } from '../types';
 
 const ROLE_LABELS: Record<PrimaryRole, string> = {
@@ -41,11 +41,7 @@ export default function ProfilePage() {
   }
 
   if (loading) {
-    return (
-      <div className="page">
-        <Loading />
-      </div>
-    );
+    return <ProfileSkeleton />;
   }
 
   if (!profile) {
