@@ -330,7 +330,7 @@ export default function VCPage() {
                       <span className="vc-cat__score">{row.score}/10</span>
                     </div>
                     <span className="vc-meter">
-                      <i style={{ width: `${row.score * 10}%` }} />
+                      <i style={{ transform: `scaleX(${row.score / 10})` }} />
                     </span>
                     <label className="vc-cat__score-input">
                       Score

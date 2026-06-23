@@ -95,7 +95,6 @@ export function ProfileForm({
     <form onSubmit={handleSubmit} className="profile-form">
       <section className="form-group">
         <div className="form-group__title">
-          <span>01</span>
           <h3>Basic identity</h3>
         </div>
         <label>
@@ -119,7 +118,6 @@ export function ProfileForm({
 
       <section className="form-group">
         <div className="form-group__title">
-          <span>02</span>
           <h3>Role &amp; skills</h3>
         </div>
         <label>
@@ -154,7 +152,6 @@ export function ProfileForm({
 
       <section className="form-group">
         <div className="form-group__title">
-          <span>03</span>
           <h3>Availability &amp; timezone</h3>
         </div>
         <label>
@@ -181,7 +178,6 @@ export function ProfileForm({
 
       <section className="form-group">
         <div className="form-group__title">
-          <span>04</span>
           <h3>Interests &amp; bio</h3>
         </div>
         <label>
