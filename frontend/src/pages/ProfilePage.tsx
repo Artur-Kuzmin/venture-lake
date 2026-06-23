@@ -65,7 +65,6 @@ export default function ProfilePage() {
   if (editing) {
     return (
       <div className="page">
-        <span className="home-eyebrow">Founder signal</span>
         <h1>Edit your profile</h1>
         <p className="placeholder profile-intro">
           This is what powers how you're matched into a team. Keep it sharp.
@@ -84,7 +83,6 @@ export default function ProfilePage() {
     <div className="page">
       <div className="profile-head">
         <div>
-          <span className="home-eyebrow">Founder signal</span>
           <h1>{profile.name}</h1>
           <p className="placeholder">
             {ROLE_LABELS[profile.primaryRole]} · {profile.city} · {profile.timezone}

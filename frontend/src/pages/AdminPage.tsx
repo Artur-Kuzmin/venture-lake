@@ -34,7 +34,6 @@ export default function AdminPage() {
     <div className="page admin-page">
       <header className="admin-header">
         <div>
-          <span className="qt-syslabel admin-syslabel">Internal // Control panel</span>
           <h1>Admin</h1>
         </div>
         <span className="status status--warning">Admin only</span>

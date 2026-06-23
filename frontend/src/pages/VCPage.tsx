@@ -179,7 +179,6 @@ export default function VCPage() {
     <div className="page">
       <header className="vc-header">
         <div>
-          <span className="qt-syslabel">Review desk</span>
           <h1>VC Review Desk</h1>
         </div>
         <span className="status status--success">Approved reviewer</span>

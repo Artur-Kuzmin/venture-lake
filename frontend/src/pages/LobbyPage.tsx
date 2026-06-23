@@ -109,7 +109,6 @@ export default function LobbyPage() {
   return (
     <div className="page queue-terminal">
       <header className="qt-header">
-        <span className="qt-syslabel">System // Matchmaking active</span>
         <h1>Queue Terminal</h1>
         <p className="placeholder">
           Join solo or with friends. VentureLake will match you into a balanced founder team.

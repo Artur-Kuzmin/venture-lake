@@ -22,7 +22,6 @@ export default function ShowcasePage() {
   return (
     <div className="page">
       <section className="sc-hero">
-        <span className="home-eyebrow">Proof of work</span>
         <h1>Reviewed startup work from VentureLake teams.</h1>
         <p className="lead">
           Every project here was built by a matched founder team in a focused mission, scored by a

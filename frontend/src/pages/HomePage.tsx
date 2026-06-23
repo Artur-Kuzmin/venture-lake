@@ -105,7 +105,6 @@ export default function HomePage() {
       {/* The High-Velocity Cycle ------------------------------------------- */}
       <section className="lp-section">
         <div className="lp-section__head">
-          <span className="home-eyebrow">The high-velocity cycle</span>
           <h2>From profile to proof in one focused loop.</h2>
         </div>
         <ol className="lp-steps">
@@ -122,7 +121,6 @@ export default function HomePage() {
       {/* Proof of work ----------------------------------------------------- */}
       <section className="lp-section lp-split">
         <div>
-          <span className="home-eyebrow">Proof of work</span>
           <h2>Execution you can point to — not just connections.</h2>
           <p className="lp-body">
             VentureLake isn't networking for its own sake. Every mission turns real work into
@@ -146,7 +144,6 @@ export default function HomePage() {
       {/* VC review --------------------------------------------------------- */}
       <section className="lp-section lp-split">
         <div>
-          <span className="home-eyebrow">VC review</span>
           <h2>Reviewed by people who judge real ventures.</h2>
           <p className="lp-body">
             Approved VC-style reviewers independently score each submitted mission across five

@@ -57,7 +57,6 @@ export default function CreateProfilePage() {
 
   return (
     <div className="page">
-      <span className="home-eyebrow">Founder signal</span>
       <h1>Set up your Founder Signal</h1>
       <p className="placeholder profile-intro">
         Your Founder Signal powers matchmaking — your role, skills, availability, and interests

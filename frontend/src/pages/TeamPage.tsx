@@ -508,7 +508,6 @@ export default function TeamPage() {
     <div className="page team-page">
       <header className="team-header">
         <div>
-          <span className="qt-syslabel">Mission control</span>
           <h1>Team {inLobby ? 'lobby' : 'workspace'}</h1>
           <span className={`status ${statusMeta.cls}`}>{statusMeta.label}</span>
         </div>

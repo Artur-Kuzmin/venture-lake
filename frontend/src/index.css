@@ -593,9 +593,10 @@ textarea {
   flex-direction: column;
   gap: 0.85rem;
   padding: 1.1rem 1.15rem 1.2rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface-2);
+}
+
+.form-group + .form-group {
+  border-top: 1px solid var(--border);
 }
 
 .form-group__title {
@@ -922,14 +923,6 @@ p.badge {
 }
 
 /* Queue Terminal --------------------------------------------------------- */
-
-.qt-syslabel {
-  font-family: var(--mono);
-  font-size: 0.76rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--accent-strong);
-}
 
 .qt-header h1 {
   margin: 0.5rem 0 0.35rem;
@@ -1692,17 +1685,6 @@ p.badge {
   flex-direction: column;
   gap: 0.4rem;
   padding: 0.9rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  box-shadow: var(--inner-hi);
-  transition: border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
-}
-
-.mw-task:hover {
-  border-color: var(--border-strong);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
 }
 
 .mw-task strong {
@@ -1841,14 +1823,10 @@ p.badge {
   flex-direction: column;
   gap: 0.55rem;
   padding: 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  transition: border-color 0.15s ease;
 }
 
-.vc-cat:focus-within {
-  border-color: var(--border-strong);
+.vc-cat + .vc-cat {
+  border-top: 1px solid var(--border);
 }
 
 .vc-cat__head {
@@ -2045,10 +2023,6 @@ p.badge {
 
 .admin-header h1 {
   margin: 0.4rem 0 0;
-}
-
-.admin-syslabel {
-  color: var(--text-subtle);
 }
 
 .admin-note {

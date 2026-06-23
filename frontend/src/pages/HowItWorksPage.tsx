@@ -40,7 +40,6 @@ export default function HowItWorksPage() {
   return (
     <div className="page">
       <section className="hiw-hero">
-        <span className="home-eyebrow">How VentureLake works</span>
         <h1>From profile to proof-of-work.</h1>
         <p className="lead">
           VentureLake turns founder networking into a structured execution loop: match, build,
