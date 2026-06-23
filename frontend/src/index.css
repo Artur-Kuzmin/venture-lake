@@ -1823,10 +1823,15 @@ p.badge {
   flex-direction: column;
   gap: 0.55rem;
   padding: 1rem;
+  align-self: stretch;
 }
 
 .vc-cat + .vc-cat {
   border-top: 1px solid var(--border);
+}
+
+.vc-cat textarea {
+  width: 100%;
 }
 
 .vc-cat__head {
@@ -1861,6 +1866,7 @@ p.badge {
 }
 
 .vc-meter {
+  width: 100%;
   height: 6px;
   border-radius: 999px;
   background: var(--surface-3);
