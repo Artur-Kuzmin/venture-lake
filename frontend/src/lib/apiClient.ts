@@ -6,6 +6,13 @@
 import type { ApiErrorBody } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
+
+// Token persistence. The JWT is kept in localStorage so the session survives a
+// reload / dev-server restart, and is read fresh on every request below.
+// SECURITY NOTE (do not implement now): localStorage is readable by any script
+// on the page, so a successful XSS could exfiltrate this token. For production,
+// revisit moving the token to an httpOnly, Secure cookie set by the backend
+// (not JS-readable) and retire this localStorage path.
 const TOKEN_KEY = 'venturelake.token';
 
 export function getToken(): string | null {

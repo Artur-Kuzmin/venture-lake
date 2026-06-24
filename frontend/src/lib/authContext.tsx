@@ -10,7 +10,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { api, clearToken, getToken, setToken } from './apiClient';
+import { api, ApiError, clearToken, getToken, setToken } from './apiClient';
 import type { FounderProfile, User, VCMe } from '../types';
 
 interface ViewerStatus {
@@ -47,10 +47,24 @@ const EMPTY_ADMIN: AdminStatus = { resolved: false, isAdmin: false };
 // Probe the two cold-load status endpoints. Each failure degrades to "no
 // access" so a logged-out/expired token never grants anything.
 async function loadViewer(): Promise<ViewerStatus> {
-  const [profile, vc] = await Promise.all([
-    api.get<FounderProfile | null>('/api/profile/me').catch(() => null),
-    api.get<VCMe>('/api/vc/me').catch(() => null),
+  const [profileRes, vcRes] = await Promise.allSettled([
+    api.get<FounderProfile | null>('/api/profile/me'),
+    api.get<VCMe>('/api/vc/me'),
   ]);
+  // A 401 on the profile probe means the stored token is invalid/expired — as
+  // opposed to a 404/no-profile, a non-VC 403, or a transient network/5xx error,
+  // none of which should log the user out. Re-throw it so the caller can clear
+  // the dead token instead of leaving the user "authenticated" with no profile
+  // (which would bounce them to /create-profile on every reload).
+  if (
+    profileRes.status === 'rejected' &&
+    profileRes.reason instanceof ApiError &&
+    profileRes.reason.status === 401
+  ) {
+    throw profileRes.reason;
+  }
+  const profile = profileRes.status === 'fulfilled' ? profileRes.value : null;
+  const vc = vcRes.status === 'fulfilled' ? vcRes.value : null;
   return { hasProfile: Boolean(profile), isVc: Boolean(vc?.approved) };
 }
 
@@ -116,8 +130,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((v) => {
         if (active) setViewer(v);
       })
-      .catch(() => {
-        if (active) setViewer(EMPTY_VIEWER);
+      .catch((err) => {
+        if (!active) return;
+        // The stored token was rejected (401): clear it and fall through to the
+        // normal logged-out state. Setting the token to null re-runs this effect,
+        // which short-circuits on the `!token` branch above — no refetch, no loop.
+        if (err instanceof ApiError && err.status === 401) {
+          clearToken();
+          setTokenState(null);
+        }
+        setViewer(EMPTY_VIEWER);
       })
       .finally(() => {
         if (active) setViewerLoading(false);
