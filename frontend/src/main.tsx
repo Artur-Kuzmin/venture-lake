@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { SWRConfig } from 'swr';
+import { LazyMotion, domMax } from 'framer-motion';
 import App from './App';
 import { AuthProvider } from './lib/authContext';
 import './index.css';
@@ -21,7 +22,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             shouldRetryOnError: false,
           }}
         >
-          <App />
+          {/* Lake motion runtime (UI Spec §6/§7). domMax = superset incl. layout
+              (list reorder lands in a later pass); strict makes raw motion.* throw
+              so components stay on m.* and can't drift to the full runtime. */}
+          <LazyMotion features={domMax} strict>
+            <App />
+          </LazyMotion>
         </SWRConfig>
       </AuthProvider>
     </BrowserRouter>

@@ -159,6 +159,157 @@
   font-display: swap;
 }
 
+/* ==========================================================================
+   Lake primitives (UI Spec §3/§5/§7) — Pass 2. Token-driven, built in
+   isolation: NOT applied to any screen yet (legacy classes still own the live
+   UI until Pass 3 re-points one screen).
+   ========================================================================== */
+
+/* Button — §5 */
+.vl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--vl-r-md);
+  font-family: var(--vl-font-body);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--vl-dur-micro) var(--vl-ease),
+    border-color var(--vl-dur-micro) var(--vl-ease), color var(--vl-dur-micro) var(--vl-ease);
+}
+.vl-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--vl-lake-ring);
+}
+.vl-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.vl-btn--primary {
+  background: var(--vl-lake);
+  color: #fff;
+}
+.vl-btn--primary:hover:not(:disabled) {
+  background: var(--vl-lake-strong);
+}
+.vl-btn--secondary {
+  background: var(--vl-surface);
+  border-color: var(--vl-line-strong);
+  color: var(--vl-ink);
+}
+.vl-btn--secondary:hover:not(:disabled) {
+  border-color: var(--vl-ink-faint);
+}
+.vl-btn--ghost {
+  background: transparent;
+  color: var(--vl-ink-muted);
+}
+.vl-btn--ghost:hover:not(:disabled) {
+  background: var(--vl-surface-sunk);
+}
+.vl-btn--ember {
+  background: var(--vl-ember);
+  color: #fff;
+}
+.vl-btn--ember:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+/* Input / field — §5. Label above; errors below state what to fix. */
+.vl-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vl-field__label {
+  font-family: var(--vl-font-body);
+  font-size: 13px;
+  color: var(--vl-ink-muted);
+}
+.vl-input {
+  padding: 9px 12px;
+  border: 1px solid var(--vl-line);
+  border-radius: var(--vl-r-md);
+  background: var(--vl-surface);
+  color: var(--vl-ink);
+  font-family: var(--vl-font-body);
+  font-size: 15px;
+  transition: border-color var(--vl-dur-micro) var(--vl-ease),
+    box-shadow var(--vl-dur-micro) var(--vl-ease);
+}
+.vl-input::placeholder {
+  color: var(--vl-ink-faint);
+}
+.vl-input:focus {
+  outline: none;
+  border-color: var(--vl-lake);
+  box-shadow: 0 0 0 2px var(--vl-lake-ring);
+}
+.vl-field__error {
+  font-size: 13px;
+  color: var(--vl-danger);
+}
+
+/* Card — §3/§5. Borders do the work; NO shadow on the card itself. */
+.vl-card {
+  background: var(--vl-surface);
+  border: 1px solid var(--vl-line);
+  border-radius: var(--vl-r-lg);
+  padding: 20px;
+}
+.vl-card--interactive {
+  cursor: pointer;
+  transition: border-color var(--vl-dur-micro) var(--vl-ease),
+    transform var(--vl-dur-micro) var(--vl-ease);
+}
+.vl-card--interactive:hover {
+  border-color: var(--vl-line-strong);
+  transform: translateY(-1px);
+}
+/* Selected — §5 explicitly mandates --vl-lake-tint bg + a 2px left border in
+   --vl-lake. This is the one intentional left-accent in the Lake spec (see
+   report: the impeccable hook's "side-tab" rule may flag it as a false positive). */
+.vl-card--selected {
+  background: var(--vl-lake-tint);
+  border-left: 2px solid var(--vl-lake);
+}
+/* Sunk well inside a card — differentiate stacked panels without competing shadows. */
+.vl-well {
+  background: var(--vl-surface-sunk);
+  border-radius: var(--vl-r-md);
+  padding: 12px;
+}
+
+/* State Pill — §7 (the signature element). Color comes from --vl-pill-color, set
+   per instance. */
+.vl-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.vl-pill__dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: var(--vl-r-pill);
+  background: var(--vl-pill-color, var(--vl-ink-faint));
+}
+.vl-pill__label {
+  font-family: var(--vl-font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--vl-pill-color, var(--vl-ink-muted));
+}
+
 * {
   box-sizing: border-box;
 }
