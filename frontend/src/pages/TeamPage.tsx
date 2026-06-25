@@ -2,8 +2,10 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { mutate as globalMutate } from 'swr';
 import type { KeyedMutator } from 'swr';
+import { AnimatePresence, m, useReducedMotion } from 'framer-motion';
 import { api, ApiError } from '../lib/apiClient';
 import { useApi } from '../lib/swr';
+import { listEnter, listExit, listShown, listTransition } from '../lib/motion';
 import { Countdown } from '../components/Countdown';
 import { TeamSkeleton } from '../components/PageSkeletons';
 import { Tooltip } from '../components/Tooltip';
@@ -184,6 +186,8 @@ export default function TeamPage() {
     notes: '',
   });
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  // Reduced motion drops list enter/exit + layout reorder; updates stay instant.
+  const reduce = useReducedMotion();
 
   // Revalidate every team-scoped key after an action. The backend remains the
   // source of truth; this only refreshes the shared cache.
@@ -551,14 +555,23 @@ export default function TeamPage() {
           <section className="queue-state">
             <h2>Members ({team.members.length})</h2>
         <ul className="party-members">
-          {team.members.map((m) => (
-            <li key={m.userId}>
-              {inLobby && (m.ready ? '✅ ' : '⬜ ')}
-              {m.displayName}
-              {m.userId === team.currentUserId && <span className="badge"> · you</span>}
-              {m.isCaptain && <span className="badge"> · captain</span>}
-            </li>
-          ))}
+          <AnimatePresence initial={false}>
+            {team.members.map((mem) => (
+              <m.li
+                key={mem.userId}
+                layout={!reduce}
+                initial={reduce ? false : listEnter}
+                animate={reduce ? undefined : listShown}
+                exit={reduce ? undefined : listExit}
+                transition={reduce ? undefined : listTransition}
+              >
+                {inLobby && (mem.ready ? '✅ ' : '⬜ ')}
+                {mem.displayName}
+                {mem.userId === team.currentUserId && <span className="badge"> · you</span>}
+                {mem.isCaptain && <span className="badge"> · captain</span>}
+              </m.li>
+            ))}
+          </AnimatePresence>
         </ul>
 
         {inLobby && (
@@ -796,24 +809,40 @@ export default function TeamPage() {
                 <p className="placeholder">No nominees yet.</p>
               ) : (
                 <ul className="party-members">
-                  {captainVote.nominees.map((n) => (
-                    <li key={n.userId}>
-                      {n.displayName} — {n.votes} vote{n.votes === 1 ? '' : 's'}
-                      {captainVote.myVote === n.userId ? (
-                        <span className="badge"> · your vote</span>
-                      ) : (
-                        <button
-                          type="button"
-                          className="link-button"
-                          onClick={() => voteCaptain(n.userId)}
-                          disabled={busy}
+                  <AnimatePresence initial={false}>
+                    {/* Leaderboard: votes desc, name tiebreak. An optimistic vote
+                        changes a tally and the layout (FLIP) reorder lands the row
+                        in its new rank on the snappy spring. */}
+                    {[...captainVote.nominees]
+                      .sort(
+                        (a, b) => b.votes - a.votes || a.displayName.localeCompare(b.displayName)
+                      )
+                      .map((n) => (
+                        <m.li
+                          key={n.userId}
+                          layout={!reduce}
+                          initial={reduce ? false : listEnter}
+                          animate={reduce ? undefined : listShown}
+                          exit={reduce ? undefined : listExit}
+                          transition={reduce ? undefined : listTransition}
                         >
-                          {' '}
-                          Vote
-                        </button>
-                      )}
-                    </li>
-                  ))}
+                          {n.displayName} — {n.votes} vote{n.votes === 1 ? '' : 's'}
+                          {captainVote.myVote === n.userId ? (
+                            <span className="badge"> · your vote</span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="link-button"
+                              onClick={() => voteCaptain(n.userId)}
+                              disabled={busy}
+                            >
+                              {' '}
+                              Vote
+                            </button>
+                          )}
+                        </m.li>
+                      ))}
+                  </AnimatePresence>
                 </ul>
               )}
             </>
@@ -1280,14 +1309,30 @@ export default function TeamPage() {
               {messages.length === 0 ? (
                 <p className="placeholder">No messages yet. Say hello to your team.</p>
               ) : (
-                messages.map((msg) => (
-                  <div key={msg.id} className="chat-line">
-                    <strong>{msg.displayName}:</strong> {msg.body}
-                    {pending.includes(msg.id) && (
-                      <span className="placeholder"> · sending…</span>
-                    )}
-                  </div>
-                ))
+                <AnimatePresence initial={false}>
+                  {messages.map((msg) => {
+                    // Only YOUR optimistic message (temp id) animates its landing;
+                    // polled messages render in place — matching the optimistic
+                    // doctrine of animating your own action's local appearance.
+                    const optimistic = msg.id.startsWith('temp-');
+                    return (
+                      <m.div
+                        key={msg.id}
+                        className="chat-line"
+                        layout={!reduce}
+                        initial={reduce || !optimistic ? false : listEnter}
+                        animate={reduce ? undefined : listShown}
+                        exit={reduce ? undefined : listExit}
+                        transition={reduce ? undefined : listTransition}
+                      >
+                        <strong>{msg.displayName}:</strong> {msg.body}
+                        {pending.includes(msg.id) && (
+                          <span className="placeholder"> · sending…</span>
+                        )}
+                      </m.div>
+                    );
+                  })}
+                </AnimatePresence>
               )}
               <div ref={chatEndRef} />
             </div>
