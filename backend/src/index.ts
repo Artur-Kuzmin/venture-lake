@@ -33,13 +33,42 @@ if (process.env.TRUST_PROXY === 'true') {
 // Baseline security headers (safe defaults for a JSON API).
 app.use(helmet());
 
-const corsOrigin = process.env.CORS_ORIGIN?.split(',').map((o) => o.trim());
-if ((!corsOrigin || corsOrigin.length === 0) && process.env.NODE_ENV === 'production') {
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Production allowlist of exact frontend origins (comma-separated). FRONTEND_ORIGIN
+// is the canonical name; CORS_ORIGIN is accepted as a backward-compatible alias so
+// an existing deployment doesn't break.
+const allowedOrigins = (process.env.FRONTEND_ORIGIN ?? process.env.CORS_ORIGIN ?? '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+if (isProduction && allowedOrigins.length === 0) {
   console.warn(
-    '[cors] CORS_ORIGIN is not set — allowing all origins. Set CORS_ORIGIN to your frontend origin in production.'
+    '[cors] No FRONTEND_ORIGIN set in production — all cross-origin browser requests will be blocked. Set FRONTEND_ORIGIN to your frontend origin.'
   );
 }
-app.use(cors({ origin: corsOrigin && corsOrigin.length > 0 ? corsOrigin : true }));
+
+// In development, Vite grabs whatever localhost port is free (5173, 5174, 5175, …),
+// so allow any http://localhost:<port> / http://127.0.0.1:<port> instead of pinning
+// one port. In production, allow ONLY the explicit FRONTEND_ORIGIN allowlist — never
+// a wildcard. cors() also answers the OPTIONS preflight and echoes the matching
+// Access-Control-Allow-Origin for the request's origin.
+const LOCALHOST_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+app.use(
+  cors({
+    origin(origin, callback) {
+      // No Origin header (curl, server-to-server, same-origin) isn't a CORS
+      // request — let it through.
+      if (!origin) return callback(null, true);
+      const allowed = isProduction
+        ? allowedOrigins.includes(origin)
+        : LOCALHOST_ORIGIN.test(origin);
+      callback(null, allowed);
+    },
+    credentials: true,
+  })
+);
 // Cap request bodies to a sane size; the app only sends small JSON payloads.
 app.use(express.json({ limit: '1mb' }));
 
