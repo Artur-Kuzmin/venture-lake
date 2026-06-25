@@ -310,6 +310,124 @@
   color: var(--vl-pill-color, var(--vl-ink-muted));
 }
 
+/* ==========================================================================
+   Lake applied to ONE screen — the Team workspace (Pass 3). Scoped under
+   .lake-scope so it re-skins only this screen's legacy classes to Lake tokens;
+   no other screen changes. The status chips are the real <StatePill> component
+   in the markup; everything else is token-mapped here.
+   ========================================================================== */
+.lake-scope {
+  color: var(--vl-ink);
+}
+.lake-scope h1,
+.lake-scope h2 {
+  font-family: var(--vl-font-display);
+}
+.lake-scope .placeholder,
+.lake-scope .match-explanation {
+  color: var(--vl-ink-muted);
+}
+.lake-scope a {
+  color: var(--vl-lake);
+}
+
+/* Cards — Lake surface, borders only, NO shadow (§3). Keep the legacy layout +
+   child styling; only the surface is re-skinned. */
+.lake-scope .queue-state {
+  background: var(--vl-surface);
+  border-color: var(--vl-line);
+  border-radius: var(--vl-r-lg);
+  box-shadow: none;
+}
+.lake-scope .queue-state:hover {
+  border-color: var(--vl-line-strong);
+  box-shadow: none;
+}
+/* Sunk well (mission timer) — differentiate panels without competing shadows;
+   drop the legacy brand-tinted border/glow (§8). */
+.lake-scope .mw-timer {
+  background: var(--vl-surface-sunk);
+  border-color: var(--vl-line);
+  box-shadow: none;
+}
+
+/* Buttons (§5) — primary lake; CSS :active press feedback (whileTap parity,
+   reduced-motion-safe via the global prefers-reduced-motion rule). */
+.lake-scope button:not(.link-button):not(.icon-btn) {
+  background: var(--vl-lake);
+  color: #fff;
+  border: 1px solid transparent;
+  border-radius: var(--vl-r-md);
+}
+.lake-scope button:not(.link-button):not(.icon-btn):hover:not(:disabled) {
+  background: var(--vl-lake-strong);
+}
+.lake-scope button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.lake-scope .link-button {
+  background: transparent;
+  color: var(--vl-ink-muted);
+  border-radius: var(--vl-r-md);
+}
+.lake-scope .link-button:hover:not(:disabled) {
+  background: var(--vl-surface-sunk);
+  color: var(--vl-ink);
+}
+/* The single commit/execute action (§5): start the 72-hour mission. */
+.lake-scope .vl-ember-action {
+  background: var(--vl-ember);
+}
+.lake-scope .vl-ember-action:hover:not(:disabled) {
+  background: var(--vl-ember);
+  filter: brightness(1.06);
+}
+
+/* Inputs (§5) — Lake surface + lake focus ring. */
+.lake-scope input,
+.lake-scope select,
+.lake-scope textarea {
+  background: var(--vl-surface);
+  border-color: var(--vl-line);
+  border-radius: var(--vl-r-md);
+  color: var(--vl-ink);
+}
+.lake-scope ::placeholder {
+  color: var(--vl-ink-faint);
+}
+.lake-scope input:focus,
+.lake-scope select:focus,
+.lake-scope textarea:focus,
+.lake-scope button:focus-visible,
+.lake-scope .icon-btn:focus-visible {
+  outline: none;
+  border-color: var(--vl-lake);
+  box-shadow: 0 0 0 2px var(--vl-lake-ring);
+}
+
+/* Badges → Lake mono chips (§2.3). */
+.lake-scope .badge {
+  background: var(--vl-surface-sunk);
+  color: var(--vl-ink-muted);
+  border-radius: var(--vl-r-sm);
+  font-family: var(--vl-font-mono);
+}
+
+/* Data is load-bearing mono (§1): timers + mono labels. */
+.lake-scope .timer,
+.lake-scope .qt-mono {
+  font-family: var(--vl-font-mono);
+}
+
+/* Chat send icon-button adopts lake. */
+.lake-scope .icon-btn--primary {
+  background: var(--vl-lake);
+  border-color: transparent;
+}
+.lake-scope .icon-btn--primary:hover:not(:disabled) {
+  background: var(--vl-lake-strong);
+}
+
 * {
   box-sizing: border-box;
 }

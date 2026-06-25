@@ -7,6 +7,7 @@ import { useApi } from '../lib/swr';
 import { Countdown } from '../components/Countdown';
 import { TeamSkeleton } from '../components/PageSkeletons';
 import { Tooltip } from '../components/Tooltip';
+import { StatePill, type PillState } from '../components/lake/StatePill';
 import type {
   CaptainVoteState,
   ContinuationChoice,
@@ -68,6 +69,25 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
   PUBLISHED: { label: 'Published', cls: 'status--success' },
   DISBANDED: { label: 'Session ended', cls: '' },
   FAILED: { label: 'Mission failed', cls: 'status--danger' },
+};
+
+// Display-only mapping of team status to a Lake StatePill state (§7). draft=idle,
+// active=in-progress, committed=executing, done=settled, blocked=failed.
+const STATUS_PILL: Record<string, PillState> = {
+  LOBBY: 'draft',
+  IDEA_VOTING: 'active',
+  CAPTAIN_VOTING: 'active',
+  MISSION_ACTIVE: 'committed',
+  SUBMITTED: 'active',
+  UNDER_REVIEW: 'active',
+  APPEAL_WINDOW: 'active',
+  REVIEW_FINAL: 'done',
+  CONTINUATION_VOTING: 'active',
+  CONTINUING: 'committed',
+  PIVOTING: 'active',
+  PUBLISHED: 'done',
+  DISBANDED: 'draft',
+  FAILED: 'blocked',
 };
 
 // Formats a remaining duration (ms) as "Dd HH:MM:SS", or "Time's up".
@@ -505,11 +525,11 @@ export default function TeamPage() {
     team.missionDeadlineAt != null && new Date(team.missionDeadlineAt).getTime() <= Date.now();
 
   return (
-    <div className="page team-page">
+    <div className="page team-page lake-scope">
       <header className="team-header">
         <div>
           <h1>Team {inLobby ? 'lobby' : 'workspace'}</h1>
-          <span className={`status ${statusMeta.cls}`}>{statusMeta.label}</span>
+          <StatePill state={STATUS_PILL[team.status] ?? 'active'} label={statusMeta.label} />
         </div>
         {(team.status === 'MISSION_ACTIVE' || team.status === 'CONTINUING') &&
           team.missionDeadlineAt && (
@@ -754,7 +774,7 @@ export default function TeamPage() {
                     <p className="placeholder">All deliverables assigned.</p>
                   )}
                   {isCaptain && deliverablesAssigned && (
-                    <button type="button" onClick={startMission} disabled={busy}>
+                    <button type="button" className="vl-ember-action" onClick={startMission} disabled={busy}>
                       {busy ? 'Starting…' : 'Start 72-hour mission'}
                     </button>
                   )}
@@ -804,9 +824,10 @@ export default function TeamPage() {
       {team.status === 'MISSION_ACTIVE' && mission && (
         <section className="queue-state mission-workspace">
           <div className="mw-head">
-            <span className={`status ${missionExpired ? 'status--danger' : 'status--success'}`}>
-              {missionExpired ? 'Deadline passed' : 'Mission active'}
-            </span>
+            <StatePill
+              state={missionExpired ? 'blocked' : 'committed'}
+              label={missionExpired ? 'Deadline passed' : 'Mission active'}
+            />
             <h2 className="mw-title">{mission.title}</h2>
             <p className="mw-brief">{mission.brief}</p>
           </div>
@@ -1238,7 +1259,7 @@ export default function TeamPage() {
         <aside className="team-col team-col--right">
           <section className="queue-state team-side-card">
             <h2>Mission status</h2>
-            <span className={`status ${statusMeta.cls}`}>{statusMeta.label}</span>
+            <StatePill state={STATUS_PILL[team.status] ?? 'active'} label={statusMeta.label} />
             {team.reviewFinal && (
               <p>
                 <strong>
