@@ -59,6 +59,106 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ==========================================================================
+   Lake design system — VentureLake UI Spec ("Lake"), Pass 1: tokens + fonts.
+   Added in PARALLEL with the legacy tokens above during migration. Nothing
+   consumes --vl-* yet, so this ships no visual change. Dark is the default
+   (the app boots dark); [data-theme="light"] is the flip.
+   ========================================================================== */
+:root {
+  /* Surface & ink — dark default */
+  --vl-paper: #0e1213;
+  --vl-surface: #161b1c;
+  --vl-surface-sunk: #111617;
+  --vl-ink: #eaf0f0;
+  --vl-ink-muted: #9aa6a8;
+  --vl-ink-faint: #65726f;
+  --vl-line: #232a2b;
+  --vl-line-strong: #313a3b;
+
+  /* Brand "lake" — lifted for contrast on dark */
+  --vl-lake: #38b0b8;
+  --vl-lake-strong: #56c6cd;
+  --vl-lake-tint: #12302f;
+  --vl-lake-ring: rgba(56, 176, 184, 0.35);
+
+  /* Ember — warm signal, ONLY the active commit/execute moment */
+  --vl-ember: #e0844c;
+  --vl-ember-tint: #2a1b12;
+
+  /* Semantic — desaturated so they don't fight the brand */
+  --vl-ok: #4fb585;
+  --vl-warn: #c99a3e;
+  --vl-danger: #d86a5e;
+
+  /* Elevation — ONE shadow, for floating things only */
+  --vl-shadow-pop: 0 10px 34px -10px rgba(0, 0, 0, 0.55), 0 2px 8px -2px rgba(0, 0, 0, 0.4);
+
+  /* Radius — tight, by element (4/6/10), never one radius on everything */
+  --vl-r-sm: 4px;
+  --vl-r-md: 6px;
+  --vl-r-lg: 10px;
+  --vl-r-pill: 999px;
+
+  /* Motion */
+  --vl-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --vl-dur-micro: 150ms;
+  --vl-dur: 220ms;
+
+  /* Type — display used with restraint; body carries text; mono carries data */
+  --vl-font-display: 'Clash Grotesk', 'Geist', system-ui, sans-serif;
+  --vl-font-body: 'Geist', 'Inter', system-ui, sans-serif;
+  --vl-font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* The flip — set data-theme="light" on <html> to switch */
+[data-theme='light'] {
+  color-scheme: light;
+  --vl-paper: #f7f8f8;
+  --vl-surface: #ffffff;
+  --vl-surface-sunk: #f1f3f3;
+  --vl-ink: #15191b;
+  --vl-ink-muted: #5a6468;
+  --vl-ink-faint: #8a9498;
+  --vl-line: #e4e8e8;
+  --vl-line-strong: #d2d8d8;
+  --vl-lake: #0d5d63;
+  --vl-lake-strong: #084a50;
+  --vl-lake-tint: #e4efef;
+  --vl-lake-ring: rgba(13, 93, 99, 0.3);
+  --vl-ember: #c75b25;
+  --vl-ember-tint: #fbede3;
+  --vl-ok: #2f7d5b;
+  --vl-warn: #9a6b14;
+  --vl-danger: #ae3a2f;
+  --vl-shadow-pop: 0 8px 28px -8px rgba(16, 28, 30, 0.22), 0 2px 6px -2px rgba(16, 28, 30, 0.12);
+}
+
+/* Self-hosted faces — place the files in frontend/public/fonts/ (see report).
+   These are inert until a component sets font-family to a --vl-font-* token
+   (Pass 2+); a missing file simply falls back to the next family in the stack. */
+@font-face {
+  font-family: 'Clash Grotesk';
+  src: url('/fonts/ClashGrotesk-Variable.woff2') format('woff2-variations');
+  font-weight: 200 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Variable.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/fonts/GeistMono-Variable.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 * {
   box-sizing: border-box;
 }
