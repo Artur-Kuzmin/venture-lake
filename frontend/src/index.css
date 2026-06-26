@@ -66,15 +66,20 @@
    (the app boots dark); [data-theme="light"] is the flip.
    ========================================================================== */
 :root {
-  /* Surface & ink — dark default */
+  /* Surface & ink — dark default. Elevation is a real tonal ladder (§4): sunk <
+     paper < surface (rails) < surface-raised (the dominant panel). Borders +
+     tone do the work; edge-hi is a 1px top highlight that fakes a light source
+     so a card lifts off the page WITHOUT a shadow. */
   --vl-paper: #0e1213;
-  --vl-surface: #161b1c;
-  --vl-surface-sunk: #111617;
+  --vl-surface: #1a2123;
+  --vl-surface-raised: #232c2e;
+  --vl-surface-sunk: #0b0e0f;
   --vl-ink: #eaf0f0;
   --vl-ink-muted: #9aa6a8;
   --vl-ink-faint: #65726f;
-  --vl-line: #232a2b;
-  --vl-line-strong: #313a3b;
+  --vl-line: #2a3234;
+  --vl-line-strong: #3b4547;
+  --vl-edge-hi: #323c3e;
 
   /* Brand "lake" — lifted for contrast on dark */
   --vl-lake: #38b0b8;
@@ -114,14 +119,16 @@
 /* The flip — set data-theme="light" on <html> to switch */
 [data-theme='light'] {
   color-scheme: light;
-  --vl-paper: #f7f8f8;
-  --vl-surface: #ffffff;
-  --vl-surface-sunk: #f1f3f3;
+  --vl-paper: #f1f3f3;
+  --vl-surface: #fafbfb;
+  --vl-surface-raised: #ffffff;
+  --vl-surface-sunk: #e9eded;
   --vl-ink: #15191b;
   --vl-ink-muted: #5a6468;
   --vl-ink-faint: #8a9498;
-  --vl-line: #e4e8e8;
-  --vl-line-strong: #d2d8d8;
+  --vl-line: #e1e6e6;
+  --vl-line-strong: #ccd3d3;
+  --vl-edge-hi: #ffffff;
   --vl-lake: #0d5d63;
   --vl-lake-strong: #084a50;
   --vl-lake-tint: #e4efef;
@@ -336,12 +343,28 @@
 .lake-scope .queue-state {
   background: var(--vl-surface);
   border-color: var(--vl-line);
+  border-top-color: var(--vl-edge-hi);
   border-radius: var(--vl-r-lg);
   box-shadow: none;
 }
 .lake-scope .queue-state:hover {
   border-color: var(--vl-line-strong);
+  border-top-color: var(--vl-edge-hi);
   box-shadow: none;
+}
+/* Elevation (§4): the center column is the workspace's primary panel — lift it
+   one surface step above the rails so ONE panel dominates instead of a grid of
+   equal boxes. Tone + borders only, no shadow. */
+.lake-scope .team-col--center > section.queue-state {
+  background: var(--vl-surface-raised);
+  border-color: var(--vl-line-strong);
+  border-top-color: var(--vl-edge-hi);
+}
+/* Recessed surfaces sit BELOW the panel: the chat transcript reads as an inset
+   well (form fields get the same treatment in the inputs block below). */
+.lake-scope .chat-log {
+  background: var(--vl-surface-sunk);
+  border-color: var(--vl-line);
 }
 /* Sunk well (mission timer) — differentiate panels without competing shadows;
    drop the legacy brand-tinted border/glow (§8). */
@@ -393,7 +416,7 @@
 .lake-scope input,
 .lake-scope select,
 .lake-scope textarea {
-  background: var(--vl-surface);
+  background: var(--vl-surface-sunk);
   border-color: var(--vl-line);
   border-radius: var(--vl-r-md);
   color: var(--vl-ink);
@@ -432,6 +455,79 @@
 }
 .lake-scope .icon-btn--primary:hover:not(:disabled) {
   background: var(--vl-lake-strong);
+}
+
+/* Toast (§9.5) — floating action feedback. Fixed to the viewport, but a child of
+   .lake-scope so these scoped rules style it. A floating element earns the one
+   allowed shadow (--vl-shadow-pop); cards never do. Tone shows on a left accent. */
+.lake-scope .vl-toast-region {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 40px));
+  pointer-events: none;
+}
+.lake-scope .vl-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 12px 12px 14px;
+  background: var(--vl-surface-raised);
+  border: 1px solid var(--vl-line-strong);
+  border-left: 3px solid var(--vl-ink-faint);
+  border-radius: var(--vl-r-md);
+  box-shadow: var(--vl-shadow-pop);
+  color: var(--vl-ink);
+  pointer-events: auto;
+}
+.lake-scope .vl-toast--error {
+  border-left-color: var(--vl-danger);
+}
+.lake-scope .vl-toast--success {
+  border-left-color: var(--vl-ok);
+}
+.lake-scope .vl-toast__msg {
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.lake-scope .vl-toast__close {
+  flex: none;
+  background: transparent;
+  border: none;
+  border-radius: var(--vl-r-sm);
+  color: var(--vl-ink-faint);
+  padding: 2px;
+  line-height: 0;
+  cursor: pointer;
+}
+.lake-scope .vl-toast__close:hover {
+  color: var(--vl-ink);
+}
+
+/* Empty state (§9.5) — quiet, centered placeholder for a list with no items. */
+.lake-scope .vl-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 22px 16px;
+  text-align: center;
+}
+.lake-scope .vl-empty__icon {
+  color: var(--vl-ink-faint);
+  opacity: 0.8;
+  line-height: 0;
+}
+.lake-scope .vl-empty__text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--vl-ink-muted);
 }
 
 * {

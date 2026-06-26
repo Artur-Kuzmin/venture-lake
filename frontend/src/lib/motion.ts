@@ -13,3 +13,10 @@ export const listEnter = { opacity: 0, y: 6 } as const;
 export const listShown = { opacity: 1, y: 0 } as const;
 export const listExit = { opacity: 0 } as const;
 export const listTransition = { layout: spring, default: { duration: dur.micro, ease } } as const;
+
+// Toast / overlay motion (UI Spec §6/§9.5). Floating feedback rises in on the
+// snappy spring and drops out on a quick fade. Gated by reduced motion at the
+// call site. The one allowed shadow (--vl-shadow-pop) lives in CSS, not here.
+export const toastEnter = { opacity: 0, y: 12, scale: 0.98 } as const;
+export const toastShown = { opacity: 1, y: 0, scale: 1 } as const;
+export const toastExit = { opacity: 0, y: 8, scale: 0.98 } as const;

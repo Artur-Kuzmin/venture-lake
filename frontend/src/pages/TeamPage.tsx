@@ -10,6 +10,8 @@ import { Countdown } from '../components/Countdown';
 import { TeamSkeleton } from '../components/PageSkeletons';
 import { Tooltip } from '../components/Tooltip';
 import { StatePill, type PillState } from '../components/lake/StatePill';
+import { Toast } from '../components/lake/Toast';
+import { EmptyState } from '../components/lake/EmptyState';
 import type {
   CaptainVoteState,
   ContinuationChoice,
@@ -805,9 +807,10 @@ export default function TeamPage() {
                   Self-nominate
                 </button>
               )}
-              {captainVote.nominees.length === 0 ? (
-                <p className="placeholder">No nominees yet.</p>
-              ) : (
+              <EmptyState show={captainVote.nominees.length === 0}>
+                No nominees yet.
+              </EmptyState>
+              {captainVote.nominees.length > 0 && (
                 <ul className="party-members">
                   <AnimatePresence initial={false}>
                     {/* Leaderboard: votes desc, name tiebreak. An optimistic vote
@@ -1274,7 +1277,7 @@ export default function TeamPage() {
         </section>
       )}
 
-          {error && <p className="form-error">{error}</p>}
+          <Toast message={error} tone="error" onClose={() => setError(null)} />
 
           {(inLobby ||
             team.status === 'REVIEW_FINAL' ||
@@ -1306,9 +1309,10 @@ export default function TeamPage() {
           <section className="queue-state chat">
             <h2>Chat</h2>
             <div className="chat-log">
-              {messages.length === 0 ? (
-                <p className="placeholder">No messages yet. Say hello to your team.</p>
-              ) : (
+              <EmptyState show={messages.length === 0}>
+                No messages yet. Say hello to your team.
+              </EmptyState>
+              {messages.length > 0 && (
                 <AnimatePresence initial={false}>
                   {messages.map((msg) => {
                     // Only YOUR optimistic message (temp id) animates its landing;
