@@ -3,6 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Preload the Lake display face (Clash Grotesk, variable) so headings paint
+         in-brand on first render. One file covers all weights; crossorigin is
+         required because fonts are always fetched in CORS mode. -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/ClashGrotesk-Variable.woff2" />
     <title>VentureLake</title>
   </head>
   <body>
