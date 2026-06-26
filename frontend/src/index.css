@@ -353,13 +353,16 @@
 
 /* Buttons (§5) — primary lake; CSS :active press feedback (whileTap parity,
    reduced-motion-safe via the global prefers-reduced-motion rule). */
-.lake-scope button:not(.link-button):not(.icon-btn) {
+/* The generic Lake primary. Carve out .vl-ember-action too (alongside
+   link-button/icon-btn) so the reserved commit action keeps its ember fill —
+   otherwise this rule's higher specificity would override .vl-ember-action. */
+.lake-scope button:not(.link-button):not(.icon-btn):not(.vl-ember-action) {
   background: var(--vl-lake);
   color: #fff;
   border: 1px solid transparent;
   border-radius: var(--vl-r-md);
 }
-.lake-scope button:not(.link-button):not(.icon-btn):hover:not(:disabled) {
+.lake-scope button:not(.link-button):not(.icon-btn):not(.vl-ember-action):hover:not(:disabled) {
   background: var(--vl-lake-strong);
 }
 .lake-scope button:active:not(:disabled) {
@@ -377,6 +380,9 @@
 /* The single commit/execute action (§5): start the 72-hour mission. */
 .lake-scope .vl-ember-action {
   background: var(--vl-ember);
+  color: #fff;
+  border: 1px solid transparent;
+  border-radius: var(--vl-r-md);
 }
 .lake-scope .vl-ember-action:hover:not(:disabled) {
   background: var(--vl-ember);
