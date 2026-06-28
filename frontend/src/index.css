@@ -76,8 +76,9 @@
   --vl-faint: #9b978b;        /* tertiary / locked */
 
   --vl-blue: #1b2be8;         /* LIVE / now / primary interactive */
-  --vl-green: #1fbf4b;        /* GO / done / success */
-  --vl-green-ink: #06250f;
+  --vl-green: #1fbf4b;        /* GO / success — FILL ONLY (1.95:1 as text on paper, fails AA) */
+  --vl-green-text: #166534;   /* green TEXT on paper (5.71:1, passes AA) */
+  --vl-green-ink: #06250f;    /* text ON green fills (6.8:1 on --vl-green) */
 
   --vl-border: #0a0a0a;       /* always solid; 2px structural, 1px internal */
 
@@ -164,149 +165,177 @@
    UI until Pass 3 re-points one screen).
    ========================================================================== */
 
-/* Button — §5 */
+/* Button — §4/§5. Square, 2px border, uppercase 800. Variants: primary (paper
+   fill / ink text / blue hard shadow), ghost (transparent, bordered), go (green
+   fill / green-ink text / paper hard shadow). Press-into-shadow on the shadowed
+   variants: hover translate 2px + half shadow; active translate 4px + shadow 0.
+   Reduced-motion nulls the translate (media query below). */
 .vl-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 40px;
-  padding: 8px 14px;
-  border: 1px solid transparent;
-  border-radius: var(--vl-r-md);
-  font-family: var(--vl-font-body);
-  font-size: 15px;
-  font-weight: 500;
+  min-height: 44px;
+  padding: 12px 20px;
+  border: 2px solid var(--vl-ink);
+  border-radius: 0;
+  background: transparent;
+  color: var(--vl-ink);
+  font-family: var(--vl-fd);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   line-height: 1;
   cursor: pointer;
-  transition: background-color var(--vl-dur-micro) var(--vl-ease),
-    border-color var(--vl-dur-micro) var(--vl-ease), color var(--vl-dur-micro) var(--vl-ease);
+  transition: transform 120ms linear, box-shadow 120ms linear,
+    background-color 120ms linear, color 120ms linear;
 }
 .vl-btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--vl-lake-ring);
+  outline: 2px solid var(--vl-blue);
+  outline-offset: 2px;
 }
 .vl-btn:disabled {
   opacity: 0.5;
   cursor: default;
 }
 .vl-btn--primary {
-  background: var(--vl-lake);
-  color: #fff;
+  background: var(--vl-paper);
+  color: var(--vl-ink);
+  box-shadow: var(--vl-shadow-blue);
 }
 .vl-btn--primary:hover:not(:disabled) {
-  background: var(--vl-lake-strong);
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--vl-blue);
 }
-.vl-btn--secondary {
-  background: var(--vl-surface);
-  border-color: var(--vl-line-strong);
-  color: var(--vl-ink);
-}
-.vl-btn--secondary:hover:not(:disabled) {
-  border-color: var(--vl-ink-faint);
+.vl-btn--primary:active:not(:disabled) {
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 transparent;
 }
 .vl-btn--ghost {
   background: transparent;
-  color: var(--vl-ink-muted);
+  color: var(--vl-ink);
 }
 .vl-btn--ghost:hover:not(:disabled) {
-  background: var(--vl-surface-sunk);
+  background: var(--vl-paper-2);
 }
-.vl-btn--ember {
-  background: var(--vl-ember);
-  color: #fff;
+.vl-btn--ghost:active:not(:disabled) {
+  transform: translate(2px, 2px);
 }
-.vl-btn--ember:hover:not(:disabled) {
-  filter: brightness(1.06);
+.vl-btn--go {
+  background: var(--vl-green);
+  color: var(--vl-green-ink);
+  border-color: var(--vl-green-ink);
+  box-shadow: var(--vl-shadow-paper);
+}
+.vl-btn--go:hover:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--vl-paper);
+}
+.vl-btn--go:active:not(:disabled) {
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 transparent;
 }
 
-/* Input / field — §5. Label above; errors below state what to fix. */
+/* Input / field — §4. Square, 2px border. Labels are mono uppercase data; the
+   field value itself stays Archivo sentence-case (§6 — body/reading text is never
+   mono/uppercase; only selects, which are data controls, flip to mono — see the
+   .lake-scope select rule). */
 .vl-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 .vl-field__label {
-  font-family: var(--vl-font-body);
-  font-size: 13px;
-  color: var(--vl-ink-muted);
+  font-family: var(--vl-fm);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vl-muted);
 }
 .vl-input {
-  padding: 9px 12px;
-  border: 1px solid var(--vl-line);
-  border-radius: var(--vl-r-md);
-  background: var(--vl-surface);
+  padding: 10px 12px;
+  border: 2px solid var(--vl-ink);
+  border-radius: 0;
+  background: var(--vl-paper-2);
   color: var(--vl-ink);
-  font-family: var(--vl-font-body);
+  font-family: var(--vl-fd);
   font-size: 15px;
-  transition: border-color var(--vl-dur-micro) var(--vl-ease),
-    box-shadow var(--vl-dur-micro) var(--vl-ease);
+  transition: outline-color 120ms linear;
 }
 .vl-input::placeholder {
-  color: var(--vl-ink-faint);
+  color: var(--vl-faint);
 }
 .vl-input:focus {
-  outline: none;
-  border-color: var(--vl-lake);
-  box-shadow: 0 0 0 2px var(--vl-lake-ring);
+  outline: 2px solid var(--vl-blue);
+  outline-offset: 2px;
 }
 .vl-field__error {
   font-size: 13px;
   color: var(--vl-danger);
 }
 
-/* Card — §3/§5. Borders do the work; NO shadow on the card itself. */
+/* Card — §3/§4. Square, 2px ink border; borders do the work. Interactive cards
+   lift into a hard shadow on hover. Selected = blue border + blue hard shadow
+   (NO side-stripe — Concrete signals selection with a full edge, not a tab). */
 .vl-card {
-  background: var(--vl-surface);
-  border: 1px solid var(--vl-line);
-  border-radius: var(--vl-r-lg);
+  background: var(--vl-paper);
+  border: 2px solid var(--vl-ink);
+  border-radius: 0;
   padding: 20px;
 }
 .vl-card--interactive {
   cursor: pointer;
-  transition: border-color var(--vl-dur-micro) var(--vl-ease),
-    transform var(--vl-dur-micro) var(--vl-ease);
+  transition: transform 120ms linear, box-shadow 120ms linear;
 }
 .vl-card--interactive:hover {
-  border-color: var(--vl-line-strong);
-  transform: translateY(-1px);
+  transform: translate(-2px, -2px);
+  box-shadow: var(--vl-shadow);
 }
-/* Selected — §5 explicitly mandates --vl-lake-tint bg + a 2px left border in
-   --vl-lake. This is the one intentional left-accent in the Lake spec (see
-   report: the impeccable hook's "side-tab" rule may flag it as a false positive). */
 .vl-card--selected {
-  background: var(--vl-lake-tint);
-  border-left: 2px solid var(--vl-lake);
+  border-color: var(--vl-blue);
+  box-shadow: var(--vl-shadow-blue);
 }
-/* Sunk well inside a card — differentiate stacked panels without competing shadows. */
+/* Sunk well inside a card — paper-2, square, differentiates stacked panels. */
 .vl-well {
-  background: var(--vl-surface-sunk);
-  border-radius: var(--vl-r-md);
+  background: var(--vl-paper-2);
+  border-radius: 0;
   padding: 12px;
 }
 
-/* State Pill — §7 (the signature element). Color comes from --vl-pill-color, set
-   per instance. */
+/* Status kicker / tag — §4/§7 (was StatePill). A mono kicker line; NO dots. The
+   "live" states (active / committed) render as a solid blue tag with paper text;
+   done = green TEXT (the deep --vl-green-text, AA on paper); blocked = danger;
+   draft = faint. State comes from the data-state attribute set by the component. */
 .vl-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-}
-.vl-pill__dot {
-  width: 6px;
-  height: 6px;
-  flex: none;
-  border-radius: var(--vl-r-pill);
-  background: var(--vl-pill-color, var(--vl-ink-faint));
+  font-family: var(--vl-fm);
+  font-size: 11px;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .vl-pill__label {
-  font-family: var(--vl-font-mono);
-  font-size: 12px;
-  line-height: 1.4;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--vl-pill-color, var(--vl-ink-muted));
+  color: var(--vl-muted);
+}
+.vl-pill[data-state='active'] .vl-pill__label,
+.vl-pill[data-state='committed'] .vl-pill__label {
+  background: var(--vl-blue);
+  color: var(--vl-paper);
+  padding: 2px 8px;
+}
+.vl-pill[data-state='done'] .vl-pill__label {
+  color: var(--vl-green-text);
+}
+.vl-pill[data-state='blocked'] .vl-pill__label {
+  color: var(--vl-danger);
+}
+.vl-pill[data-state='draft'] .vl-pill__label {
+  color: var(--vl-faint);
 }
 
 /* ==========================================================================
@@ -434,64 +463,117 @@
   box-shadow: none;
 }
 
-/* Buttons (§5) — primary lake; CSS :active press feedback (whileTap parity,
-   reduced-motion-safe via the global prefers-reduced-motion rule). */
-/* The generic Lake primary. Carve out .vl-ember-action too (alongside
-   link-button/icon-btn) so the reserved commit action keeps its ember fill —
-   otherwise this rule's higher specificity would override .vl-ember-action. */
+/* Buttons (§4/§5) — live Team re-skin, mirroring the .vl-btn primitive until the
+   markup migrates to .vl-btn in Pass 3 (then this whole block is deleted). The
+   generic button = primary (paper / ink / blue hard shadow); .link-button = ghost
+   (bordered); .vl-ember-action = go (green fill / green-ink text / paper shadow —
+   this fixes Pass 1's white-on-green). All square, uppercase 800, press-into-shadow. */
 .lake-scope button:not(.link-button):not(.icon-btn):not(.vl-ember-action) {
-  background: var(--vl-lake);
-  color: #fff;
-  border: 1px solid transparent;
-  border-radius: var(--vl-r-md);
+  background: var(--vl-paper);
+  color: var(--vl-ink);
+  border: 2px solid var(--vl-ink);
+  border-radius: 0;
+  min-height: 44px;
+  font-family: var(--vl-fd);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  box-shadow: var(--vl-shadow-blue);
+  transition: transform 120ms linear, box-shadow 120ms linear, background-color 120ms linear;
 }
 .lake-scope button:not(.link-button):not(.icon-btn):not(.vl-ember-action):hover:not(:disabled) {
-  background: var(--vl-lake-strong);
+  background: var(--vl-paper);
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--vl-blue);
 }
-.lake-scope button:active:not(:disabled) {
-  transform: scale(0.98);
+.lake-scope button:not(.link-button):not(.icon-btn):not(.vl-ember-action):active:not(:disabled) {
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 transparent;
 }
 .lake-scope .link-button {
   background: transparent;
-  color: var(--vl-ink-muted);
-  border-radius: var(--vl-r-md);
+  color: var(--vl-ink);
+  border: 2px solid var(--vl-ink);
+  border-radius: 0;
+  min-height: 44px;
+  font-family: var(--vl-fd);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  transition: transform 120ms linear, background-color 120ms linear, color 120ms linear;
 }
 .lake-scope .link-button:hover:not(:disabled) {
-  background: var(--vl-surface-sunk);
+  background: var(--vl-paper-2);
   color: var(--vl-ink);
 }
-/* The single commit/execute action (§5): start the 72-hour mission. */
+.lake-scope .link-button:active:not(:disabled) {
+  transform: translate(2px, 2px);
+}
+/* The single commit/execute action (§4): start the 72-hour mission — the GO button. */
 .lake-scope .vl-ember-action {
-  background: var(--vl-ember);
-  color: #fff;
-  border: 1px solid transparent;
-  border-radius: var(--vl-r-md);
+  background: var(--vl-green);
+  color: var(--vl-green-ink);
+  border: 2px solid var(--vl-green-ink);
+  border-radius: 0;
+  min-height: 44px;
+  font-family: var(--vl-fd);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  box-shadow: var(--vl-shadow-paper);
+  transition: transform 120ms linear, box-shadow 120ms linear;
 }
 .lake-scope .vl-ember-action:hover:not(:disabled) {
-  background: var(--vl-ember);
-  filter: brightness(1.06);
+  background: var(--vl-green);
+  filter: none;
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--vl-paper);
+}
+.lake-scope .vl-ember-action:active:not(:disabled) {
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 transparent;
+}
+/* Press interaction gated behind reduced-motion (§4/§5) — the depth (shadow)
+   stays, but the element does not physically shift. */
+@media (prefers-reduced-motion: reduce) {
+  .vl-btn:hover, .vl-btn:active,
+  .vl-card--interactive:hover,
+  .lake-scope button:hover, .lake-scope button:active,
+  .lake-scope .link-button:hover, .lake-scope .link-button:active,
+  .lake-scope .vl-ember-action:hover, .lake-scope .vl-ember-action:active {
+    transform: none;
+  }
 }
 
-/* Inputs (§5) — Lake surface + lake focus ring. */
+/* Inputs (§4) — square, 2px ink border, paper-2 surface. Text inputs + textareas
+   keep Archivo sentence-case (§6: reading/body text is never mono/uppercase).
+   Selects are DATA controls, so they flip to mono uppercase (§4). */
 .lake-scope input,
 .lake-scope select,
 .lake-scope textarea {
-  background: var(--vl-surface-sunk);
-  border-color: var(--vl-line);
-  border-radius: var(--vl-r-md);
+  background: var(--vl-paper-2);
+  border: 2px solid var(--vl-ink);
+  border-radius: 0;
   color: var(--vl-ink);
+  font-family: var(--vl-fd);
+}
+.lake-scope select {
+  font-family: var(--vl-fm);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-weight: 700;
 }
 .lake-scope ::placeholder {
-  color: var(--vl-ink-faint);
+  color: var(--vl-faint);
 }
+/* Focus = 2px+ offset outline (§6 a11y floor) instead of a soft ring. */
 .lake-scope input:focus,
 .lake-scope select:focus,
 .lake-scope textarea:focus,
 .lake-scope button:focus-visible,
 .lake-scope .icon-btn:focus-visible {
-  outline: none;
-  border-color: var(--vl-lake);
-  box-shadow: 0 0 0 2px var(--vl-lake-ring);
+  outline: 2px solid var(--vl-blue);
+  outline-offset: 2px;
 }
 
 /* Badges → Lake mono chips (§2.3). */
@@ -535,20 +617,21 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 12px 12px 12px 14px;
-  background: var(--vl-surface-raised);
-  border: 1px solid var(--vl-line-strong);
-  border-left: 3px solid var(--vl-ink-faint);
-  border-radius: var(--vl-r-md);
-  box-shadow: var(--vl-shadow-pop);
+  padding: 12px 14px 12px 16px;
+  background: var(--vl-paper);
+  border: 2px solid var(--vl-ink);
+  border-left-width: 6px;
+  border-left-color: var(--vl-blue); /* info = blue (§4) */
+  border-radius: 0;
+  box-shadow: var(--vl-shadow);
   color: var(--vl-ink);
   pointer-events: auto;
 }
-.lake-scope .vl-toast--error {
-  border-left-color: var(--vl-danger);
-}
 .lake-scope .vl-toast--success {
-  border-left-color: var(--vl-ok);
+  border-left-color: var(--vl-green); /* success = green (§4) */
+}
+.lake-scope .vl-toast--error {
+  border-left-color: var(--vl-ink); /* error = ink (§4) */
 }
 .lake-scope .vl-toast__msg {
   flex: 1;
@@ -569,7 +652,9 @@
   color: var(--vl-ink);
 }
 
-/* Empty state (§9.5) — quiet, centered placeholder for a list with no items. */
+/* Empty state (§4) — square bordered cell with a mono kicker + workflow copy.
+   The kicker is a label (mono uppercase); the copy is reading text, so it stays
+   Archivo sentence-case (§6). */
 .lake-scope .vl-empty {
   display: flex;
   flex-direction: column;
@@ -578,13 +663,25 @@
   gap: 8px;
   padding: 22px 16px;
   text-align: center;
+  border: 2px solid var(--vl-ink);
+  border-radius: 0;
+  background: var(--vl-paper-2);
+}
+.lake-scope .vl-empty__kicker {
+  font-family: var(--vl-fm);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vl-muted);
 }
 .lake-scope .vl-empty__icon {
-  color: var(--vl-ink-faint);
+  color: var(--vl-faint);
   opacity: 0.8;
   line-height: 0;
 }
 .lake-scope .vl-empty__text {
+  font-family: var(--vl-fd);
   font-size: 14px;
   line-height: 1.5;
   color: var(--vl-ink-muted);

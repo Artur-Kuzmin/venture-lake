@@ -8,10 +8,12 @@ import { dur, ease } from '../../lib/motion';
 export function EmptyState({
   show,
   icon,
+  kicker,
   children,
 }: {
   show: boolean;
   icon?: ReactNode;
+  kicker?: string;
   children: ReactNode;
 }) {
   const reduce = useReducedMotion();
@@ -30,6 +32,7 @@ export function EmptyState({
               {icon}
             </span>
           )}
+          {kicker && <span className="vl-empty__kicker">{kicker}</span>}
           <div className="vl-empty__text">{children}</div>
         </m.div>
       )}

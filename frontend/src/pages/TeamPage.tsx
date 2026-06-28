@@ -807,8 +807,8 @@ export default function TeamPage() {
                   Self-nominate
                 </button>
               )}
-              <EmptyState show={captainVote.nominees.length === 0}>
-                No nominees yet.
+              <EmptyState show={captainVote.nominees.length === 0} kicker="Captain vote">
+                No nominees yet — nominate a teammate to get the vote moving.
               </EmptyState>
               {captainVote.nominees.length > 0 && (
                 <ul className="party-members">
@@ -1309,8 +1309,8 @@ export default function TeamPage() {
           <section className="queue-state chat">
             <h2>Chat</h2>
             <div className="chat-log">
-              <EmptyState show={messages.length === 0}>
-                No messages yet. Say hello to your team.
+              <EmptyState show={messages.length === 0} kicker="Team chat">
+                Quiet so far — introduce yourself and claim a deliverable.
               </EmptyState>
               {messages.length > 0 && (
                 <AnimatePresence initial={false}>

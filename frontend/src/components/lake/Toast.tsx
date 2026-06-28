@@ -1,8 +1,8 @@
 import { AnimatePresence, m, useReducedMotion } from 'framer-motion';
 import { useEffect, useRef } from 'react';
-import { spring, toastEnter, toastExit, toastShown } from '../../lib/motion';
+import { toastEnter, toastExit, toastShown, toastTransition } from '../../lib/motion';
 
-type Tone = 'error' | 'success';
+type Tone = 'info' | 'success' | 'error';
 
 // Lake toast (UI Spec §9.5). Floating, dismissible feedback for transient action
 // results — driven by a single message string so it is trivial to wire to an
@@ -42,7 +42,7 @@ export function Toast({
             initial={reduce ? false : toastEnter}
             animate={reduce ? undefined : toastShown}
             exit={reduce ? undefined : toastExit}
-            transition={spring}
+            transition={toastTransition}
           >
             <span className="vl-toast__msg">{message}</span>
             <button
