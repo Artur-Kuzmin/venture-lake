@@ -60,108 +60,100 @@
 }
 
 /* ==========================================================================
-   Lake design system — VentureLake UI Spec ("Lake"), Pass 1: tokens + fonts.
-   Added in PARALLEL with the legacy tokens above during migration. Nothing
-   consumes --vl-* yet, so this ships no visual change. Dark is the default
-   (the app boots dark); [data-theme="light"] is the flip.
+   Concrete design system — VentureLake "Concrete" UI Spec (brutalist).
+   SUPERSEDES the dark "Lake" tokens above for in-scope surfaces, but reuses the
+   .lake-scope namespace (kept verbatim for code continuity — do NOT rename; the
+   visual system is just called Concrete now). Light is the default and ONLY mode
+   in v1 (no dark variant). Derive everything from these tokens — never inline a
+   color, shadow, or font. Pixel reference: docs/concrete-reference.html.
    ========================================================================== */
 :root {
-  /* Surface & ink — dark default. Elevation is a real tonal ladder (§4): sunk <
-     paper < surface (rails) < surface-raised (the dominant panel). Borders +
-     tone do the work; edge-hi is a 1px top highlight that fakes a light source
-     so a card lifts off the page WITHOUT a shadow. */
-  --vl-paper: #0e1213;
-  --vl-surface: #1a2123;
-  --vl-surface-raised: #232c2e;
-  --vl-surface-sunk: #0b0e0f;
-  --vl-ink: #eaf0f0;
-  --vl-ink-muted: #9aa6a8;
-  --vl-ink-faint: #65726f;
-  --vl-line: #2a3234;
-  --vl-line-strong: #3b4547;
-  --vl-edge-hi: #323c3e;
+  /* Color — light "concrete" (§2.1) */
+  --vl-paper: #e9e6dd;        /* raw concrete canvas */
+  --vl-paper-2: #e1ddd2;      /* hover / secondary surface */
+  --vl-ink: #0a0a0a;          /* near-black — text, borders, structure */
+  --vl-muted: #56534b;        /* secondary text */
+  --vl-faint: #9b978b;        /* tertiary / locked */
 
-  /* Brand "lake" — lifted for contrast on dark */
-  --vl-lake: #38b0b8;
-  --vl-lake-strong: #56c6cd;
-  --vl-lake-tint: #12302f;
-  --vl-lake-ring: rgba(56, 176, 184, 0.35);
+  --vl-blue: #1b2be8;         /* LIVE / now / primary interactive */
+  --vl-green: #1fbf4b;        /* GO / done / success */
+  --vl-green-ink: #06250f;
 
-  /* Ember — warm signal, ONLY the active commit/execute moment */
-  --vl-ember: #e0844c;
-  --vl-ember-tint: #2a1b12;
+  --vl-border: #0a0a0a;       /* always solid; 2px structural, 1px internal */
 
-  /* Semantic — desaturated so they don't fight the brand */
-  --vl-ok: #4fb585;
-  --vl-warn: #c99a3e;
-  --vl-danger: #d86a5e;
+  /* Hard offset shadows — NO blur, ever; used sparingly (§2.3) */
+  --vl-shadow: 4px 4px 0 var(--vl-ink);
+  --vl-shadow-blue: 4px 4px 0 var(--vl-blue);
+  --vl-shadow-paper: 4px 4px 0 var(--vl-paper);
+  --vl-shadow-lg: 6px 6px 0 var(--vl-ink);
 
-  /* Elevation — ONE shadow, for floating things only */
-  --vl-shadow-pop: 0 10px 34px -10px rgba(0, 0, 0, 0.55), 0 2px 8px -2px rgba(0, 0, 0, 0.4);
+  --vl-radius: 0;             /* ZERO everywhere — non-negotiable */
 
-  /* Radius — tight, by element (4/6/10), never one radius on everything */
-  --vl-r-sm: 4px;
-  --vl-r-md: 6px;
-  --vl-r-lg: 10px;
-  --vl-r-pill: 999px;
+  --vl-fd: 'Archivo', system-ui, sans-serif;       /* display + body */
+  --vl-fm: 'Space Mono', ui-monospace, monospace;  /* data, labels, clock */
 
-  /* Motion */
+  /* ----------------------------------------------------------------------
+     TEMPORARY legacy-alias bridge. The .lake-scope / .vl-* rules further down
+     still reference the OLD Lake token names; these aliases re-point them onto
+     the Concrete palette so the Team surface re-skins to concrete WITHOUT a
+     markup change (Pass 1 = tokens only, §8.1, "low structural risk"). Passes
+     2–3 rewrite those consumers to the canonical names above and DELETE this
+     block. Do not add new uses of these names.
+     ---------------------------------------------------------------------- */
+  --vl-surface: var(--vl-paper);
+  --vl-surface-raised: var(--vl-paper);
+  --vl-surface-sunk: var(--vl-paper-2);
+  --vl-ink-muted: var(--vl-muted);
+  --vl-ink-faint: var(--vl-faint);
+  --vl-line: var(--vl-ink);          /* old 1px card edges → crisp ink */
+  --vl-line-strong: var(--vl-ink);
+  --vl-edge-hi: var(--vl-ink);       /* kill the fake top-highlight; uniform border */
+  --vl-lake: var(--vl-blue);         /* brand interactive: teal → blue */
+  --vl-lake-strong: var(--vl-blue);
+  --vl-lake-tint: var(--vl-paper-2);
+  --vl-lake-ring: var(--vl-blue);    /* solid 2px focus ring */
+  --vl-ember: var(--vl-green);       /* commit/launch action → green "go" */
+  --vl-ember-tint: var(--vl-paper-2);
+  --vl-ok: var(--vl-green);
+  --vl-warn: #8a5a00;                /* dark amber — AA on paper */
+  --vl-danger: #b3261e;              /* dark red — AA on paper */
+  --vl-shadow-pop: var(--vl-shadow); /* the one soft shadow → hard offset */
+  --vl-r-sm: var(--vl-radius);
+  --vl-r-md: var(--vl-radius);
+  --vl-r-lg: var(--vl-radius);
+  --vl-r-pill: var(--vl-radius);
+  --vl-font-display: var(--vl-fd);
+  --vl-font-body: var(--vl-fd);      /* Archivo carries body too (§2.2) */
+  --vl-font-mono: var(--vl-fm);
+
+  /* Motion — retuned to brutalist hard/fast in a later pass (§5) */
   --vl-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --vl-dur-micro: 150ms;
   --vl-dur: 220ms;
-
-  /* Type — display used with restraint; body carries text; mono carries data */
-  --vl-font-display: 'Clash Grotesk', 'Geist', system-ui, sans-serif;
-  --vl-font-body: 'Geist', 'Inter', system-ui, sans-serif;
-  --vl-font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, monospace;
 }
 
-/* The flip — set data-theme="light" on <html> to switch */
-[data-theme='light'] {
-  color-scheme: light;
-  --vl-paper: #f1f3f3;
-  --vl-surface: #fafbfb;
-  --vl-surface-raised: #ffffff;
-  --vl-surface-sunk: #e9eded;
-  --vl-ink: #15191b;
-  --vl-ink-muted: #5a6468;
-  --vl-ink-faint: #8a9498;
-  --vl-line: #e1e6e6;
-  --vl-line-strong: #ccd3d3;
-  --vl-edge-hi: #ffffff;
-  --vl-lake: #0d5d63;
-  --vl-lake-strong: #084a50;
-  --vl-lake-tint: #e4efef;
-  --vl-lake-ring: rgba(13, 93, 99, 0.3);
-  --vl-ember: #c75b25;
-  --vl-ember-tint: #fbede3;
-  --vl-ok: #2f7d5b;
-  --vl-warn: #9a6b14;
-  --vl-danger: #ae3a2f;
-  --vl-shadow-pop: 0 8px 28px -8px rgba(16, 28, 30, 0.22), 0 2px 6px -2px rgba(16, 28, 30, 0.12);
-}
-
-/* Self-hosted faces — place the files in frontend/public/fonts/ (see report).
-   These are inert until a component sets font-family to a --vl-font-* token
-   (Pass 2+); a missing file simply falls back to the next family in the stack. */
+/* Self-hosted faces (§2.2). Archivo carries display + body (variable, one file);
+   Space Mono carries data/labels (two static faces — it ships no variable build).
+   Committed in the SAME commit as this @font-face (the Clash deploy-404 lesson);
+   Archivo's display weight is preloaded in index.html. */
 @font-face {
-  font-family: 'Clash Grotesk';
-  src: url('/fonts/ClashGrotesk-Variable.woff2') format('woff2-variations');
-  font-weight: 200 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Geist';
-  src: url('/fonts/Geist-Variable.woff2') format('woff2-variations');
+  font-family: 'Archivo';
+  src: url('/fonts/Archivo-Variable.woff2') format('woff2-variations');
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: 'Geist Mono';
-  src: url('/fonts/GeistMono-Variable.woff2') format('woff2-variations');
-  font-weight: 100 900;
+  font-family: 'Space Mono';
+  src: url('/fonts/SpaceMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Space Mono';
+  src: url('/fonts/SpaceMono-Bold.woff2') format('woff2');
+  font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
@@ -325,10 +317,60 @@
    ========================================================================== */
 .lake-scope {
   color: var(--vl-ink);
+  /* Pass 1: paint the in-scope surface concrete. Without this the re-tokenized
+     light cards would float on the still-dark app body (the shell converts in
+     Pass 5). color-scheme:light makes native controls (selects) render light. */
+  background: var(--vl-paper);
+  font-family: var(--vl-fd);
+  color-scheme: light;
+
+  /* Re-point the LEGACY dark tokens to Concrete, scoped to the Team route. Much
+     of this screen still renders through legacy classes bound to the dark
+     --bg/--text/--accent/--border tokens (built for the dark shell); without
+     this remap they wash out or stay dark on paper. Scoping the legacy names
+     here re-tokenizes the whole in-scope surface at once — every state, no
+     markup change. Passes 2–3 rewrite the markup to --vl-* + real primitives
+     and this remap is deleted. */
+  --bg: var(--vl-paper);
+  --bg-sunken: var(--vl-paper-2);
+  --surface: var(--vl-paper);
+  --surface-2: var(--vl-paper-2);
+  --surface-3: var(--vl-paper-2);
+  --text: var(--vl-ink);
+  --text-muted: var(--vl-muted);
+  --text-subtle: var(--vl-muted); /* collapse tertiary→muted for AA; faint is locked-only in Concrete */
+  --border: var(--vl-ink);
+  --border-strong: var(--vl-ink);
+  --accent: var(--vl-blue);
+  --accent-hover: var(--vl-blue);
+  --accent-strong: var(--vl-blue);
+  --accent-weak: var(--vl-paper-2);
+  --ring: var(--vl-blue);
+  --success: var(--vl-green);
+  --success-weak: var(--vl-paper-2);
+  --danger: #b3261e;          /* dark red — AA on paper */
+  --danger-weak: var(--vl-paper-2);
+  --warning: #8a5a00;         /* dark amber — AA on paper */
+  --warning-weak: var(--vl-paper-2);
+  --radius: 0;
+  --radius-sm: 0;
+  --radius-lg: 0;
+  /* Concrete uses borders, not soft shadows — null the legacy blurred shadows
+     (kept as transparent no-ops so the comma-lists they sit in stay valid). */
+  --shadow-sm: 0 0 transparent;
+  --shadow-md: 0 0 transparent;
+  --inner-hi: 0 0 transparent;
+  --glow-accent: 0 0 transparent;
+  --mono: var(--vl-fm);
 }
 .lake-scope h1,
-.lake-scope h2 {
-  font-family: var(--vl-font-display);
+.lake-scope h2,
+.lake-scope h3 {
+  font-family: var(--vl-fd);
+  /* Pass 1: the legacy global `h1,h2,h3 { color: var(--text) }` (near-white, for
+     the dark shell) wins over .lake-scope's inherited ink and renders headings
+     invisible on paper. Force concrete ink within scope. */
+  color: var(--vl-ink);
 }
 .lake-scope .placeholder,
 .lake-scope .match-explanation {
@@ -336,6 +378,24 @@
 }
 .lake-scope a {
   color: var(--vl-lake);
+}
+
+/* Pass 1 — fix the few HARDCODED (non-token) legacy effects the scoped remap
+   above can't reach: a blurred blue text-glow on the timer (§6 bans soft
+   shadows) and the rounded-pill radius on the owner / category tags. Everything
+   else re-skins through the scoped legacy tokens. Deleted in Passes 2–3. */
+.lake-scope .timer {
+  text-shadow: none;
+}
+.lake-scope .mw-timer .timer {
+  animation: none; /* drop the legacy blue glow-pulse */
+}
+.lake-scope .mw-owner,
+.lake-scope p.badge {
+  border: 1px solid var(--vl-line);
+  border-radius: var(--vl-radius);
+  font-family: var(--vl-fm);
+  color: var(--vl-ink-muted);
 }
 
 /* Cards — Lake surface, borders only, NO shadow (§3). Keep the legacy layout +

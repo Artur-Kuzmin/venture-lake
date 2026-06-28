@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VENTURELAKE — Concrete reference</title>
+<!--
+  LOCKED VISUAL REFERENCE for the VentureLake "Concrete" (brutalist) redesign.
+  This is the pixel target the multi-pass rollout (see VentureLake-Concrete-Spec.md)
+  is built against — the mission-ledger signature, header band, clock, inverted
+  active block, square avatars, and the button press-into-shadow interaction.
+  Standalone document: it loads Archivo + Space Mono from Google Fonts and uses
+  its own local tokens, deliberately decoupled from the app's stylesheet so it
+  stays a stable reference across passes. Do not wire it into the build.
+-->
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#E9E6DD; --paper-2:#E1DDD2; --ink:#0A0A0A; --mut:#56534B;
+    --blue:#1B2BE8; --green:#1FBF4B; --green-ink:#06250f;
+    --b:#0A0A0A;
+    --fg:'Archivo',system-ui,sans-serif; --fm:'Space Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;} html,body{margin:0;}
+  body{font-family:var(--fg);color:var(--ink);background:var(--paper);min-height:100vh;-webkit-font-smoothing:antialiased;}
+  .shell{display:grid;grid-template-columns:230px 1fr;min-height:100vh;}
+
+  /* nav — text-led, hard border, inverted active */
+  .nav{border-right:2px solid var(--b);padding:0;display:flex;flex-direction:column;}
+  .brand{padding:22px 20px;border-bottom:2px solid var(--b);font-weight:900;font-size:20px;letter-spacing:-0.04em;text-transform:uppercase;}
+  .nav a{display:block;padding:15px 20px;color:var(--ink);text-decoration:none;font-size:13px;font-weight:700;letter-spacing:0.02em;text-transform:uppercase;border-bottom:1px solid rgba(10,10,10,0.14);}
+  .nav a:hover{background:var(--paper-2);}
+  .nav a.active{background:var(--ink);color:var(--paper);}
+  .nav .sp{flex:1;}
+  .nav .foot a{border-top:1px solid rgba(10,10,10,0.14);border-bottom:0;}
+
+  .main{padding:0;}
+  /* header band */
+  .band{border-bottom:2px solid var(--b);padding:34px 44px;display:flex;justify-content:space-between;align-items:flex-end;gap:30px;}
+  h1{font-weight:900;font-size:76px;line-height:0.86;letter-spacing:-0.05em;text-transform:uppercase;margin:0;}
+  .dataline{font-family:var(--fm);font-size:12.5px;font-weight:700;margin-top:18px;color:var(--mut);letter-spacing:0.02em;}
+  .dataline b{color:var(--ink);}
+  .clock{border:2px solid var(--b);background:var(--paper);padding:12px 16px;box-shadow:5px 5px 0 var(--b);text-align:center;flex-shrink:0;}
+  .clock .t{font-family:var(--fm);font-weight:700;font-size:30px;letter-spacing:-0.02em;}
+  .clock .l{font-family:var(--fm);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--mut);margin-top:4px;}
+
+  /* mission ledger */
+  .ledger{}
+  .step{display:grid;grid-template-columns:96px 1fr;border-bottom:2px solid var(--b);}
+  .num{font-weight:900;font-size:34px;line-height:1;padding:22px 0 22px 44px;color:var(--ink);border-right:2px solid var(--b);font-variant-numeric:tabular-nums;}
+  .step.done .num{color:var(--mut);}
+  .step.lock .num{color:#B6B2A6;}
+  .body{padding:22px 44px;}
+  .kicker{font-family:var(--fm);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--mut);margin:0 0 7px;display:flex;gap:10px;align-items:center;}
+  .kicker .done-tag{color:var(--green);} .kicker .live-tag{background:var(--blue);color:#fff;padding:1px 7px;}
+  .kicker .lock-tag{color:#B6B2A6;}
+  .step .h{font-weight:800;font-size:21px;letter-spacing:-0.02em;text-transform:uppercase;margin:0;}
+  .step .m{color:var(--mut);font-size:14.5px;margin:7px 0 0;line-height:1.5;max-width:640px;}
+  .step .idea{font-weight:800;text-transform:none;font-size:18px;color:var(--ink);}
+  .tag{display:inline-block;font-family:var(--fm);font-size:11px;font-weight:700;text-transform:uppercase;border:2px solid var(--b);padding:2px 8px;margin-left:10px;vertical-align:middle;}
+  .step.lock .h{color:#9b978b;}
+
+  /* ACTIVE step — inverted block, the focal point */
+  .step.active{grid-template-columns:96px 1fr;}
+  .step.active .num{background:var(--blue);color:#fff;border-right-color:var(--b);}
+  .step.active .body{background:var(--ink);color:var(--paper);}
+  .step.active .kicker{color:#8C93FF;}
+  .step.active .h{color:#fff;font-size:26px;}
+  .step.active .help{color:#A9A69D;font-size:14.5px;margin:8px 0 22px;max-width:600px;line-height:1.5;}
+  .deliv{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 0;border-top:1px solid rgba(233,230,221,0.18);}
+  .deliv:first-of-type{border-top:0;}
+  .deliv .t{font-weight:700;font-size:15px;color:#fff;text-transform:none;} .deliv .t small{display:block;color:#9b988f;font-weight:400;font-size:13px;margin-top:3px;}
+  .sel{font-family:var(--fm);font-size:12.5px;font-weight:700;background:var(--paper);color:var(--ink);border:2px solid var(--paper);padding:7px 12px;white-space:nowrap;text-transform:uppercase;}
+  .row{display:flex;gap:14px;align-items:center;margin-top:24px;flex-wrap:wrap;}
+  .btn{font-family:var(--fg);font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:0.02em;border:2px solid;padding:12px 20px;cursor:pointer;background:transparent;}
+  .btn.primary{background:var(--paper);color:var(--ink);border-color:var(--paper);box-shadow:4px 4px 0 var(--blue);}
+  .btn.ghost{background:transparent;color:var(--paper);border-color:var(--paper);}
+  .gate{margin-top:26px;padding-top:22px;border-top:1px solid rgba(233,230,221,0.18);display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;}
+  .gate p{margin:0;color:#A9A69D;font-size:13.5px;} .gate p b{color:#fff;}
+  .btn.go{background:var(--green);color:var(--green-ink);border-color:var(--green-ink);box-shadow:4px 4px 0 var(--paper);font-size:14px;padding:13px 24px;}
+
+  /* chat strip */
+  .chat{padding:20px 44px;display:flex;align-items:center;gap:16px;border-bottom:2px solid var(--b);}
+  .chat .sq{width:36px;height:36px;background:var(--ink);color:var(--paper);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;}
+  .chat .x{flex:1;} .chat .x b{font-weight:800;text-transform:uppercase;font-size:13px;letter-spacing:0.02em;} .chat .x p{margin:3px 0 0;color:var(--mut);font-size:13px;}
+  .chat .open{font-family:var(--fm);font-weight:700;font-size:12px;text-transform:uppercase;border:2px solid var(--b);padding:7px 14px;box-shadow:3px 3px 0 var(--b);}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav">
+    <div class="brand">VentureLake</div>
+    <a href="#">Lobby</a>
+    <a href="#" class="active">Team</a>
+    <a href="#">Showcase</a>
+    <div class="sp"></div>
+    <div class="foot"><a href="#">Profile</a><a href="#">Log out</a></div>
+  </nav>
+
+  <main class="main">
+    <div class="band">
+      <div>
+        <h1>The<br>Mission</h1>
+        <p class="dataline">3 FOUNDERS — <b>72 HOURS</b> — STAGE <b>04/06</b> — CAPTAIN: <b>YOU</b></p>
+      </div>
+      <div class="clock">
+        <div class="t">72:00:00</div>
+        <div class="l">Starts at launch</div>
+      </div>
+    </div>
+
+    <div class="ledger">
+
+      <div class="step done">
+        <div class="num">01</div>
+        <div class="body">
+          <p class="kicker"><span class="done-tag">✓ DONE</span> · 2 DAYS AGO</p>
+          <p class="h">Team Matched</p>
+          <p class="m">Complementary roles, overlapping hours across three timezones.</p>
+        </div>
+      </div>
+
+      <div class="step done">
+        <div class="num">02</div>
+        <div class="body">
+          <p class="kicker"><span class="done-tag">✓ DONE</span> · YESTERDAY</p>
+          <p class="h">Idea Accepted</p>
+          <p class="m"><span class="idea">Invoice financing for indie agencies</span><span class="tag">Fintech</span></p>
+          <p class="m">Advance cash against unpaid invoices with same-day underwriting.</p>
+        </div>
+      </div>
+
+      <div class="step done">
+        <div class="num">03</div>
+        <div class="body">
+          <p class="kicker"><span class="done-tag">✓ DONE</span> · 3H AGO</p>
+          <p class="h">Captain Elected — You</p>
+          <p class="m">You call the shots once the clock is running.</p>
+        </div>
+      </div>
+
+      <div class="step active">
+        <div class="num">04</div>
+        <div class="body">
+          <p class="kicker"><span class="live-tag">LIVE</span> HAPPENING NOW</p>
+          <p class="h">Assign The Work</p>
+          <p class="help">Decide who owns each deliverable. You can't start the clock until all three have an owner.</p>
+
+          <div class="deliv">
+            <div class="t">Landing page + waitlist<small>Public page with working email capture.</small></div>
+            <div class="sel">Mara Lindqvist ▾</div>
+          </div>
+          <div class="deliv">
+            <div class="t">Underwriting demo<small>A clickable flow that scores a sample invoice.</small></div>
+            <div class="sel">You ▾</div>
+          </div>
+          <div class="deliv">
+            <div class="t">Pitch deck<small>Ten-slide investor narrative.</small></div>
+            <div class="sel">Devin Osei ▾</div>
+          </div>
+
+          <div class="row">
+            <button class="btn primary">Save assignments</button>
+            <button class="btn ghost">Regenerate split</button>
+          </div>
+
+          <div class="gate">
+            <p><b>All three assigned.</b> Launching starts the 72-hour clock for everyone.</p>
+            <button class="btn go">Start the mission →</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="step lock">
+        <div class="num">05</div>
+        <div class="body">
+          <p class="kicker"><span class="lock-tag">• LOCKED</span></p>
+          <p class="h">Build · 72 Hours</p>
+          <p class="m">The clock runs. Ship your deliverables before it hits zero.</p>
+        </div>
+      </div>
+
+      <div class="step lock">
+        <div class="num">06</div>
+        <div class="body">
+          <p class="kicker"><span class="lock-tag">• LOCKED</span></p>
+          <p class="h">Ship To Showcase</p>
+          <p class="m">What you built goes live for investors and other founders to see.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="chat">
+      <div class="sq">◆</div>
+      <div class="x"><b>Team Chat</b><p>Quiet so far — introduce yourself and claim a deliverable.</p></div>
+      <div class="open">Open</div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
