@@ -94,6 +94,36 @@ const STATUS_PILL: Record<string, PillState> = {
   FAILED: 'blocked',
 };
 
+// The mission ledger (§3): six fixed steps form the 72-hour arc. team.status picks
+// the ONE active (inverted) step; earlier steps render done (quiet), later steps
+// locked (faint). Confirmed mapping: Build folds assign+72h; VC Review bundles
+// submitted/under-review/appeal/final/continuation.
+const STEP_OF_STATUS: Record<string, number> = {
+  LOBBY: 1,
+  PIVOTING: 1,
+  IDEA_VOTING: 2,
+  CAPTAIN_VOTING: 3,
+  MISSION_ACTIVE: 4,
+  CONTINUING: 4,
+  FAILED: 4,
+  SUBMITTED: 5,
+  UNDER_REVIEW: 5,
+  APPEAL_WINDOW: 5,
+  REVIEW_FINAL: 5,
+  CONTINUATION_VOTING: 5,
+  PUBLISHED: 6,
+  DISBANDED: 6,
+};
+const LEDGER_TITLES: Record<number, string> = {
+  1: 'Team matched',
+  2: 'Idea accepted',
+  3: 'Captain elected',
+  4: 'The build · 72h',
+  5: 'VC review',
+  6: 'Showcase',
+};
+type StepState = 'done' | 'active' | 'locked' | 'blocked';
+
 // Formats a remaining duration (ms) as "Dd HH:MM:SS", or "Time's up".
 function formatRemaining(ms: number): string {
   if (ms <= 0) return "Time's up";
@@ -530,33 +560,62 @@ export default function TeamPage() {
   const missionExpired =
     team.missionDeadlineAt != null && new Date(team.missionDeadlineAt).getTime() <= Date.now();
 
-  return (
-    <div className="page team-page lake-scope">
-      <header className="team-header">
-        <div>
-          <h1>Team {inLobby ? 'lobby' : 'workspace'}</h1>
-          <StatePill state={STATUS_PILL[team.status] ?? 'active'} label={statusMeta.label} />
+  // --- Ledger state (§3) ---
+  const currentStep = STEP_OF_STATUS[team.status] ?? 4;
+  const terminal =
+    team.status === 'DISBANDED' || (team.status === 'PUBLISHED' && showcase != null);
+  const stepStateOf = (n: number): StepState =>
+    n < currentStep
+      ? 'done'
+      : n > currentStep
+        ? 'locked'
+        : team.status === 'FAILED'
+          ? 'blocked'
+          : terminal
+            ? 'done'
+            : 'active';
+  const captainName = team.captainId ? nameOf(team.captainId) : null;
+  const readyCount = team.members.filter((mbr) => mbr.ready).length;
+  const finalScoreText = team.finalScore != null ? `${Math.round(team.finalScore)}/100` : '—';
+  const showTimer =
+    (team.status === 'MISSION_ACTIVE' || team.status === 'CONTINUING') &&
+    Boolean(team.missionDeadlineAt);
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+
+  const stepKicker = (state: StepState) => {
+    const map: Record<StepState, { cls: string; text: string }> = {
+      done: { cls: 'vl-step__kicker--done', text: '✓ Done' },
+      active: { cls: 'vl-step__kicker--live', text: 'Live' },
+      blocked: { cls: 'vl-step__kicker--blocked', text: '✕ Failed' },
+      locked: { cls: 'vl-step__kicker--locked', text: '• Locked' },
+    };
+    const k = map[state];
+    return <span className={`vl-step__kicker ${k.cls}`}>{k.text}</span>;
+  };
+
+  // A ledger row: number column + body (kicker, title, then state-specific body).
+  const ledgerStep = (n: number, body: React.ReactNode) => {
+    const state = stepStateOf(n);
+    return (
+      <li className={`vl-step vl-step--${state}`}>
+        <div className="vl-step__num">{pad2(n)}</div>
+        <div className="vl-step__body">
+          {stepKicker(state)}
+          <h2 className="vl-step__title">{LEDGER_TITLES[n]}</h2>
+          {state !== 'locked' ? body : null}
         </div>
-        {(team.status === 'MISSION_ACTIVE' || team.status === 'CONTINUING') &&
-          team.missionDeadlineAt && (
-            <div className="team-header__timer">
-              <span className="qt-mono">Time remaining</span>
-              <p className="timer">
-                <Countdown to={team.missionDeadlineAt} format={formatRemaining} onExpire={forceRender} />
-              </p>
-            </div>
-          )}
-      </header>
+      </li>
+    );
+  };
 
-      <div className="team-grid">
-        <aside className="team-col team-col--left">
-          {team.matchExplanation && (
-            <p className="placeholder match-explanation">{team.matchExplanation}</p>
-          )}
+  // ---- Step bodies ---------------------------------------------------------
 
-          <section className="queue-state">
-            <h2>Members ({team.members.length})</h2>
-        <ul className="party-members">
+  const step1 = ledgerStep(
+    1,
+    stepStateOf(1) === 'active' ? (
+      <>
+        {team.matchExplanation && <p className="vl-step__lead">{team.matchExplanation}</p>}
+        <ul className="vl-list">
           <AnimatePresence initial={false}>
             {team.members.map((mem) => (
               <m.li
@@ -567,640 +626,736 @@ export default function TeamPage() {
                 exit={reduce ? undefined : listExit}
                 transition={reduce ? undefined : listTransition}
               >
-                {inLobby && (mem.ready ? '✅ ' : '⬜ ')}
+                {mem.ready ? '✅ ' : '⬜ '}
                 {mem.displayName}
-                {mem.userId === team.currentUserId && <span className="badge"> · you</span>}
-                {mem.isCaptain && <span className="badge"> · captain</span>}
+                {mem.userId === team.currentUserId && ' · you'}
+                {mem.isCaptain && ' · captain'}
               </m.li>
             ))}
           </AnimatePresence>
         </ul>
-
-        {inLobby && (
-          <>
-            <button type="button" onClick={toggleReady} disabled={busy}>
-              {me?.ready ? 'Not ready' : 'Ready up'}
+        <p>
+          {readyCount} of {team.members.length} ready
+        </p>
+        <div className="vl-actions">
+          <button type="button" className="vl-btn vl-btn--ghost" onClick={toggleReady} disabled={busy}>
+            {me?.ready ? 'Not ready' : 'Ready up'}
+          </button>
+          {allReady ? (
+            <button
+              type="button"
+              className="vl-btn vl-btn--primary"
+              onClick={generateIdea}
+              disabled={busy}
+            >
+              {busy ? 'Generating…' : 'Generate mission idea'}
             </button>
-            {allReady ? (
-              <button type="button" onClick={generateIdea} disabled={busy}>
-                {busy ? 'Generating…' : 'Generate mission idea'}
-              </button>
+          ) : (
+            <p>Everyone must ready up to generate a mission idea.</p>
+          )}
+        </div>
+      </>
+    ) : (
+      <p className="vl-step__lead">
+        {team.matchExplanation || `${team.members.length} founders matched.`}
+      </p>
+    )
+  );
+
+  const step2 = ledgerStep(
+    2,
+    stepStateOf(2) === 'active' && idea ? (
+      <>
+        <p className="vl-step__lead">{idea.title}</p>
+        <span className="vl-chip">{idea.category}</span>
+        <p>{idea.description}</p>
+        <p>{idea.reasoning}</p>
+
+        {idea.status === 'PROPOSED' && (
+          <>
+            <h3>Votes</h3>
+            <ul className="vl-list">
+              {team.members.map((mbr) => {
+                const v = voteByUser.get(mbr.userId);
+                return (
+                  <li key={mbr.userId}>
+                    {mbr.displayName}:{' '}
+                    {v ? (
+                      <strong>
+                        {v.vote}
+                        {v.vote === 'NO' && v.rejectReason ? ` (${v.rejectReason})` : ''}
+                      </strong>
+                    ) : (
+                      <span>not voted</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            {!noMode ? (
+              <div className="vl-actions">
+                <button
+                  type="button"
+                  className="vl-btn vl-btn--primary"
+                  onClick={() => voteYes(idea.id)}
+                  disabled={busy}
+                >
+                  Vote YES
+                </button>
+                <button
+                  type="button"
+                  className="vl-btn vl-btn--ghost"
+                  onClick={() => setNoMode(true)}
+                  disabled={busy}
+                >
+                  Vote NO
+                </button>
+              </div>
             ) : (
-              <p className="placeholder">Everyone must ready up to generate a mission idea.</p>
+              <div className="vl-form">
+                <label>
+                  Reason
+                  <select
+                    className="vl-input"
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                  >
+                    {REJECT_REASONS.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <input
+                  className="vl-input"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Optional note"
+                  maxLength={500}
+                />
+                <div className="vl-actions">
+                  <button
+                    type="button"
+                    className="vl-btn vl-btn--primary"
+                    onClick={() => voteNo(idea.id)}
+                    disabled={busy}
+                  >
+                    Submit NO
+                  </button>
+                  <button
+                    type="button"
+                    className="vl-btn vl-btn--ghost"
+                    onClick={() => setNoMode(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             )}
           </>
         )}
-          </section>
-        </aside>
 
-        <main className="team-col team-col--center">
-          {idea &&
-        (team.status === 'IDEA_VOTING' ||
-          team.status === 'CAPTAIN_VOTING' ||
-          team.status === 'CONTINUING') && (
-        <section className="queue-state idea-card">
-          {team.status === 'CONTINUING' ? (
-            <h2>Follow-up mission proposal</h2>
-          ) : (
-            <h2>
-              Mission idea <span className="badge">#{idea.generationNumber}</span>
-            </h2>
-          )}
-          <h3>{idea.title}</h3>
-          <p className="badge">{idea.category}</p>
-          <p>{idea.description}</p>
-          <p className="placeholder">{idea.reasoning}</p>
-
-          {team.status === 'CONTINUING' && mission && (
-            <>
-              <p>
-                <strong>Proposed duration:</strong> {Math.round(mission.durationHours / 24)} days
-              </p>
-              <h3>Deliverables</h3>
-              <ul className="party-members">
-                {mission.deliverables.map((d, i) => (
-                  <li key={i}>
-                    <strong>{d.title}</strong> — {d.description}
+        {idea.status === 'REJECTED' && (
+          <>
+            <p className="vl-error">Idea rejected.</p>
+            <ul className="vl-list">
+              {idea.votes
+                .filter((v) => v.vote === 'NO')
+                .map((v) => (
+                  <li key={v.userId}>
+                    {v.displayName}: {v.rejectReason}
+                    {v.feedbackNote ? ` — ${v.feedbackNote}` : ''}
                   </li>
                 ))}
-              </ul>
-              <p className="placeholder">
-                The second mission starts only after the whole team approves it.
-              </p>
-            </>
-          )}
-
-          {idea.status === 'PROPOSED' && (
-            <>
-              <h3>Votes</h3>
-              <ul className="party-members">
-                {team.members.map((m) => {
-                  const v = voteByUser.get(m.userId);
-                  return (
-                    <li key={m.userId}>
-                      {m.displayName}:{' '}
-                      {v ? (
-                        <strong>
-                          {v.vote}
-                          {v.vote === 'NO' && v.rejectReason ? ` (${v.rejectReason})` : ''}
-                        </strong>
-                      ) : (
-                        <span className="placeholder">not voted</span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-
-              {!noMode ? (
-                <div className="vote-actions">
-                  <button type="button" onClick={() => voteYes(idea.id)} disabled={busy}>
-                    Vote YES
-                  </button>
-                  <button type="button" onClick={() => setNoMode(true)} disabled={busy} className="link-button">
-                    Vote NO
-                  </button>
-                </div>
-              ) : (
-                <div className="no-vote-form">
-                  <label>
-                    Reason
-                    <select value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}>
-                      {REJECT_REASONS.map((r) => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <input
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="Optional note"
-                    maxLength={500}
-                  />
-                  <div className="vote-actions">
-                    <button type="button" onClick={() => voteNo(idea.id)} disabled={busy}>
-                      Submit NO
-                    </button>
-                    <button type="button" onClick={() => setNoMode(false)} className="link-button">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {idea.status === 'REJECTED' && (
-            <>
-              <p className="form-error">Idea rejected.</p>
-              <ul className="party-members">
-                {idea.votes
-                  .filter((v) => v.vote === 'NO')
-                  .map((v) => (
-                    <li key={v.userId}>
-                      {v.displayName}: {v.rejectReason}
-                      {v.feedbackNote ? ` — ${v.feedbackNote}` : ''}
-                    </li>
-                  ))}
-              </ul>
-              <button type="button" onClick={regenerate} disabled={busy}>
+            </ul>
+            <div className="vl-actions">
+              <button
+                type="button"
+                className="vl-btn vl-btn--primary"
+                onClick={regenerate}
+                disabled={busy}
+              >
                 {busy ? 'Regenerating…' : 'Regenerate idea'}
               </button>
-              {team.rejectedIdeaCount >= 3 && (
-                <p className="placeholder">
-                  🔒 Vote-kick unlocks after 3 rejections (coming later).
-                </p>
-              )}
-            </>
-          )}
-
-          {idea.status === 'ACCEPTED' && (
-            <p>
-              <strong>Idea accepted!</strong> Captain selection is next.
-            </p>
-          )}
-        </section>
-      )}
-
-      {team.status === 'CAPTAIN_VOTING' && captainVote && (
-        <section className="queue-state">
-          <h2>Captain selection</h2>
-          {captainVote.captainId ? (
-            <>
-              <p>
-                <strong>Captain: {nameOf(captainVote.captainId)}.</strong>
-              </p>
-              {!mission ? (
-                isCaptain ? (
-                  <button type="button" onClick={generateDeliverables} disabled={busy}>
-                    {busy ? 'Generating…' : 'Generate deliverables'}
-                  </button>
-                ) : (
-                  <p className="placeholder">Waiting for the captain to generate deliverables.</p>
-                )
-              ) : (
-                <div className="deliverables">
-                  <h3>Deliverables</h3>
-                  <ul className="party-members">
-                    {mission.deliverables.map((d, i) => (
-                      <li key={i}>
-                        <strong>{d.title}</strong> — {d.description}
-                        <div className="deliverable-owner">
-                          Owner:{' '}
-                          {isCaptain ? (
-                            <select
-                              value={ownerByIndex[i] ?? ''}
-                              onChange={(e) =>
-                                setOwnerByIndex((p) => ({ ...p, [i]: e.target.value }))
-                              }
-                            >
-                              <option value="">— select —</option>
-                              {team.members.map((m) => (
-                                <option key={m.userId} value={m.userId}>
-                                  {m.displayName}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span>{ownerByIndex[i] ? nameOf(ownerByIndex[i]) : 'unassigned'}</span>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                  {isCaptain && (
-                    <div className="vote-actions">
-                      <button type="button" onClick={saveAssignments} disabled={busy || !allAssigned}>
-                        {busy ? 'Saving…' : 'Save assignments'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={generateDeliverables}
-                        disabled={busy}
-                        className="link-button"
-                      >
-                        Regenerate
-                      </button>
-                    </div>
-                  )}
-                  {deliverablesAssigned && (
-                    <p className="placeholder">All deliverables assigned.</p>
-                  )}
-                  {isCaptain && deliverablesAssigned && (
-                    <button type="button" className="vl-ember-action" onClick={startMission} disabled={busy}>
-                      {busy ? 'Starting…' : 'Start 72-hour mission'}
-                    </button>
-                  )}
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <p className="placeholder">
-                Self-nominate, then vote. Simple majority ({captainVote.majorityNeeded} of{' '}
-                {captainVote.memberCount}) wins.
-              </p>
-              {!captainVote.myNomination && (
-                <button type="button" onClick={nominateCaptain} disabled={busy}>
-                  Self-nominate
-                </button>
-              )}
-              <EmptyState show={captainVote.nominees.length === 0} kicker="Captain vote">
-                No nominees yet — nominate a teammate to get the vote moving.
-              </EmptyState>
-              {captainVote.nominees.length > 0 && (
-                <ul className="party-members">
-                  <AnimatePresence initial={false}>
-                    {/* Leaderboard: votes desc, name tiebreak. An optimistic vote
-                        changes a tally and the layout (FLIP) reorder lands the row
-                        in its new rank on the snappy spring. */}
-                    {[...captainVote.nominees]
-                      .sort(
-                        (a, b) => b.votes - a.votes || a.displayName.localeCompare(b.displayName)
-                      )
-                      .map((n) => (
-                        <m.li
-                          key={n.userId}
-                          layout={!reduce}
-                          initial={reduce ? false : listEnter}
-                          animate={reduce ? undefined : listShown}
-                          exit={reduce ? undefined : listExit}
-                          transition={reduce ? undefined : listTransition}
-                        >
-                          {n.displayName} — {n.votes} vote{n.votes === 1 ? '' : 's'}
-                          {captainVote.myVote === n.userId ? (
-                            <span className="badge"> · your vote</span>
-                          ) : (
-                            <button
-                              type="button"
-                              className="link-button"
-                              onClick={() => voteCaptain(n.userId)}
-                              disabled={busy}
-                            >
-                              {' '}
-                              Vote
-                            </button>
-                          )}
-                        </m.li>
-                      ))}
-                  </AnimatePresence>
-                </ul>
-              )}
-            </>
-          )}
-        </section>
-      )}
-
-      {team.status === 'MISSION_ACTIVE' && mission && (
-        <section className="queue-state mission-workspace">
-          <div className="mw-head">
-            <StatePill
-              state={missionExpired ? 'blocked' : 'committed'}
-              label={missionExpired ? 'Deadline passed' : 'Mission active'}
-            />
-            <h2 className="mw-title">{mission.title}</h2>
-            <p className="mw-brief">{mission.brief}</p>
-          </div>
-
-          {team.missionDeadlineAt && (
-            <div className={`mw-timer${missionExpired ? ' mw-timer--over' : ''}`}>
-              <span className="qt-mono">{missionExpired ? 'Deadline' : 'Time remaining'}</span>
-              <p className="timer">
-                <Countdown to={team.missionDeadlineAt} format={formatRemaining} onExpire={forceRender} />
-              </p>
             </div>
-          )}
+          </>
+        )}
 
-          {missionExpired && (
-            <p className="form-error">
-              The deadline has passed. Unless a package is submitted, this mission will be marked
-              failed.
-            </p>
-          )}
+        {idea.status === 'ACCEPTED' && (
+          <p>
+            <strong>Idea accepted!</strong> Captain selection is next.
+          </p>
+        )}
+      </>
+    ) : idea ? (
+      <>
+        <p className="vl-step__lead">{idea.title}</p>
+        <span className="vl-chip">{idea.category}</span>
+      </>
+    ) : (
+      <p>Idea pending.</p>
+    )
+  );
 
-          <h3 className="mw-section-title">Deliverables</h3>
-          <div className="mw-tasks">
-            {mission.assignments.map((a, i) => (
-              <div className="mw-task" key={i}>
-                <strong>{a.title}</strong>
-                <p>{a.description}</p>
-                <span className="mw-owner">{a.assignedToName}</span>
-              </div>
-            ))}
-            {/* A follow-up mission starts before owners are assigned. */}
-            {mission.assignments.length === 0 &&
-              mission.deliverables.map((d, i) => (
-                <div className="mw-task" key={i}>
-                  <strong>{d.title}</strong>
-                  <p>{d.description}</p>
-                </div>
-              ))}
-          </div>
-
-          <div className="mw-submit">
-            <h3 className="mw-section-title">Final submission</h3>
-            {isCaptain ? (
-              <div className="submit-form">
-                <label>
-                  Summary *
-                  <textarea value={submitForm.summary} onChange={setSubmitField('summary')} rows={3} />
-                </label>
-                <label>
-                  Pitch
-                  <textarea value={submitForm.pitchText} onChange={setSubmitField('pitchText')} rows={2} />
-                </label>
-                <label>
-                  Prototype / demo URL
-                  <input
-                    value={submitForm.prototypeUrl}
-                    onChange={setSubmitField('prototypeUrl')}
-                    placeholder="https://"
-                  />
-                </label>
-                <label>
-                  Landing page URL
-                  <input
-                    value={submitForm.landingPageUrl}
-                    onChange={setSubmitField('landingPageUrl')}
-                    placeholder="https://"
-                  />
-                </label>
-                <label>
-                  File / resource links (one per line)
-                  <textarea value={submitForm.links} onChange={setSubmitField('links')} rows={2} />
-                </label>
-                <label>
-                  Notes
-                  <textarea value={submitForm.notes} onChange={setSubmitField('notes')} rows={2} />
-                </label>
+  const step3 = ledgerStep(
+    3,
+    stepStateOf(3) === 'active' && captainVote ? (
+      captainVote.captainId ? (
+        <>
+          <p className="vl-step__lead">Captain: {nameOf(captainVote.captainId)}</p>
+          {!mission ? (
+            isCaptain ? (
+              <div className="vl-actions">
                 <button
                   type="button"
-                  onClick={submitMission}
-                  disabled={busy || !submitForm.summary.trim()}
+                  className="vl-btn vl-btn--primary"
+                  onClick={generateDeliverables}
+                  disabled={busy}
                 >
-                  {busy ? 'Submitting…' : 'Submit final package'}
+                  {busy ? 'Generating…' : 'Generate deliverables'}
                 </button>
               </div>
             ) : (
-              <p className="placeholder">
-                Your captain submits the final package. Get your deliverables done and coordinate
-                in chat before the clock runs out.
-              </p>
-            )}
-          </div>
-
-          <p className="mw-next placeholder">
-            What happens next: when the captain submits, the package enters the anonymized VC
-            review queue. A reviewer scores it across five categories, then your team gets a
-            6-hour appeal window before the score becomes final.
-          </p>
-        </section>
-      )}
-
-      {team.status === 'SUBMITTED' && team.submission && (
-        <section className="queue-state">
-          <h2>{team.submission.reviewDelayed ? 'Review delayed' : 'Submitted — awaiting VC review'}</h2>
-          {team.submission.reviewDelayed && (
-            <p className="form-error">
-              Your reviewer missed the 6-hour window, so the submission is back at the front of
-              the review queue. No action needed — the next available VC will pick it up.
-            </p>
-          )}
-          <p className="placeholder">Submitted by {team.submission.submittedByName}.</p>
-          <p>
-            <strong>Summary:</strong> {team.submission.summary}
-          </p>
-          {team.submission.pitchText && (
-            <p>
-              <strong>Pitch:</strong> {team.submission.pitchText}
-            </p>
-          )}
-          {team.submission.prototypeUrl && (
-            <p>
-              Prototype / demo:{' '}
-              <a href={team.submission.prototypeUrl} target="_blank" rel="noreferrer">
-                {team.submission.prototypeUrl}
-              </a>
-            </p>
-          )}
-          {team.submission.landingPageUrl && (
-            <p>
-              Landing page:{' '}
-              <a href={team.submission.landingPageUrl} target="_blank" rel="noreferrer">
-                {team.submission.landingPageUrl}
-              </a>
-            </p>
-          )}
-          {team.submission.links.length > 0 && (
-            <ul className="party-members">
-              {team.submission.links.map((l, i) => (
-                <li key={i}>{l}</li>
-              ))}
-            </ul>
-          )}
-          {team.submission.notes && (
-            <p>
-              <strong>Notes:</strong> {team.submission.notes}
-            </p>
-          )}
-        </section>
-      )}
-
-      {team.status === 'FAILED' && (
-        <section className="queue-state">
-          <h2>Mission failed</h2>
-          <p>
-            The 72-hour deadline passed without a submission, so this session has ended. No penalty —
-            you can jump back into the queue.
-          </p>
-          <button type="button" onClick={requeueIndividually} disabled={busy}>
-            {busy ? 'Requeuing…' : 'Requeue individually'}
-          </button>
-        </section>
-      )}
-
-      {/* Hidden in pre-review stages so a pivoted team's fresh round doesn't
-          show the previous round's review. */}
-      {team.reviews.length > 0 &&
-        !['LOBBY', 'IDEA_VOTING', 'CAPTAIN_VOTING', 'MISSION_ACTIVE'].includes(team.status) && (
-        <section className="queue-state">
-          <h2>VC review</h2>
-          {team.status === 'APPEAL_WINDOW' && team.appealWindowExpiresAt && (
-            <p className="timer">
-              ⏳ Appeal window closes in{' '}
-              <Countdown to={team.appealWindowExpiresAt} format={formatRemaining} />
-            </p>
-          )}
-
-          {team.status === 'APPEAL_WINDOW' && !appeal && team.submission && (
-            <div>
-              <button type="button" onClick={startAppeal} disabled={busy}>
-                Start appeal
-              </button>
-              <p className="placeholder">
-                A score can be appealed once. The team then has 6 hours to approve the appeal by
-                majority vote; if approved, a different VC reviews the submission blind.
-              </p>
-            </div>
-          )}
-
-          {appeal && appeal.status === 'OPEN' && !appealExpired && (
-            <div>
-              <p>
-                <strong>Appeal vote open</strong>
-              </p>
-              <p className="timer">
-                ⏳ <Countdown to={appeal.expiresAt} format={formatRemaining} onExpire={forceRender} />{' '}
-                to reach a majority
-              </p>
-              <p>
-                YES: {appeal.yesCount} · NO: {appeal.noCount} · Needed: {appeal.majorityNeeded}
-              </p>
-              <div className="vote-actions">
-                <button
-                  type="button"
-                  onClick={() => voteAppeal('YES')}
-                  disabled={busy || appeal.myVote === 'YES'}
-                >
-                  Vote YES{appeal.myVote === 'YES' ? ' ✓' : ''}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => voteAppeal('NO')}
-                  disabled={busy || appeal.myVote === 'NO'}
-                  className="link-button"
-                >
-                  Vote NO{appeal.myVote === 'NO' ? ' ✓' : ''}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {appeal?.status === 'APPROVED' && (
-            <p>Appeal approved. The submission has been sent to a new reviewer.</p>
-          )}
-
-          {appeal &&
-            (appeal.status === 'REJECTED' || (appeal.status === 'OPEN' && appealExpired)) && (
-            <p>Appeal closed. The first review is final.</p>
-          )}
-
-          {team.reviews.map((r, i) => (
-            <div key={i} className="review-block">
-              <h3>
-                {r.isAppealReview ? 'Appeal review' : 'Review'} by {r.vcName} —{' '}
-                {Math.round(r.overallScore)}/100
-              </h3>
-              <ul className="party-members">
-                {r.categories.map((c, j) => (
-                  <li key={j}>
-                    <strong>{c.category}:</strong> {c.score}/10 — {c.feedback}
+              <p>Waiting for the captain to generate deliverables.</p>
+            )
+          ) : (
+            <>
+              <h3>Deliverables</h3>
+              <ul className="vl-list">
+                {mission.deliverables.map((d, i) => (
+                  <li key={i}>
+                    <strong>{d.title}</strong> — {d.description}
+                    <div>
+                      Owner:{' '}
+                      {isCaptain ? (
+                        <select
+                          className="vl-input"
+                          value={ownerByIndex[i] ?? ''}
+                          onChange={(e) =>
+                            setOwnerByIndex((p) => ({ ...p, [i]: e.target.value }))
+                          }
+                        >
+                          <option value="">— select —</option>
+                          {team.members.map((mbr) => (
+                            <option key={mbr.userId} value={mbr.userId}>
+                              {mbr.displayName}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span>{ownerByIndex[i] ? nameOf(ownerByIndex[i]) : 'unassigned'}</span>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
-            </div>
-          ))}
-
-          {team.reviewFinal ? (
-            <>
-              <p>
-                <strong>
-                  Final score: {team.finalScore != null ? Math.round(team.finalScore) : '—'}/100
-                </strong>{' '}
-                (locked)
-              </p>
-              {team.status === 'REVIEW_FINAL' && (
-                <button type="button" onClick={startContinuationVote} disabled={busy}>
-                  Start continuation vote
-                </button>
-              )}
-            </>
-          ) : (
-            <>
-              <p className="placeholder">Score is not final until the appeal window closes.</p>
-              <p className="placeholder">
-                🔒 The continuation vote is locked until the review is final.
-              </p>
-            </>
-          )}
-        </section>
-      )}
-
-      {team.status === 'CONTINUATION_VOTING' && continuation && (
-        <section className="queue-state">
-          <h2>What's next? Team vote</h2>
-          <p className="placeholder">
-            Majority wins ({continuation.majorityNeeded} of {continuation.memberCount}). You can
-            change your vote until a majority is reached.
-          </p>
-          <ul className="party-members">
-            {CONTINUATION_OPTIONS.map((opt) => {
-              const tally = continuation.tallies.find((t) => t.choice === opt.choice)?.votes ?? 0;
-              const mine = continuation.myChoice === opt.choice;
-              return (
-                <li key={opt.choice}>
+              {isCaptain && (
+                <div className="vl-actions">
                   <button
                     type="button"
-                    onClick={() => voteContinuation(opt.choice)}
-                    disabled={busy || mine}
+                    className="vl-btn vl-btn--primary"
+                    onClick={saveAssignments}
+                    disabled={busy || !allAssigned}
                   >
-                    {opt.label}
-                  </button>{' '}
-                  — {tally} vote{tally === 1 ? '' : 's'}
-                  {mine && <span className="badge"> · your vote</span>}
-                  <div className="placeholder">{opt.hint}</div>
-                </li>
-              );
-            })}
-          </ul>
-          {continuation.votes.length > 0 && (
-            <p className="placeholder">
-              {continuation.votes
-                .map(
-                  (v) =>
-                    `${v.displayName}: ${
-                      CONTINUATION_OPTIONS.find((o) => o.choice === v.choice)?.label ?? v.choice
-                    }`
-                )
-                .join(' · ')}
-            </p>
+                    {busy ? 'Saving…' : 'Save assignments'}
+                  </button>
+                  <button
+                    type="button"
+                    className="vl-btn vl-btn--ghost"
+                    onClick={generateDeliverables}
+                    disabled={busy}
+                  >
+                    Regenerate
+                  </button>
+                </div>
+              )}
+              {deliverablesAssigned && <p>All deliverables assigned.</p>}
+              {isCaptain && deliverablesAssigned && (
+                <div className="vl-actions">
+                  <button
+                    type="button"
+                    className="vl-btn vl-btn--go"
+                    onClick={startMission}
+                    disabled={busy}
+                  >
+                    {busy ? 'Starting…' : 'Start the mission →'}
+                  </button>
+                </div>
+              )}
+            </>
           )}
-        </section>
-      )}
+        </>
+      ) : (
+        <>
+          <p>
+            Self-nominate, then vote. Simple majority ({captainVote.majorityNeeded} of{' '}
+            {captainVote.memberCount}) wins.
+          </p>
+          {!captainVote.myNomination && (
+            <div className="vl-actions">
+              <button
+                type="button"
+                className="vl-btn vl-btn--primary"
+                onClick={nominateCaptain}
+                disabled={busy}
+              >
+                Self-nominate
+              </button>
+            </div>
+          )}
+          <EmptyState show={captainVote.nominees.length === 0} kicker="Captain vote">
+            No nominees yet — nominate a teammate to get the vote moving.
+          </EmptyState>
+          {captainVote.nominees.length > 0 && (
+            <ul className="vl-list">
+              <AnimatePresence initial={false}>
+                {/* Leaderboard: votes desc, name tiebreak. An optimistic vote
+                    changes a tally and the layout (FLIP) reorder lands the row
+                    in its new rank on the snappy spring. */}
+                {[...captainVote.nominees]
+                  .sort((a, b) => b.votes - a.votes || a.displayName.localeCompare(b.displayName))
+                  .map((n) => (
+                    <m.li
+                      key={n.userId}
+                      layout={!reduce}
+                      initial={reduce ? false : listEnter}
+                      animate={reduce ? undefined : listShown}
+                      exit={reduce ? undefined : listExit}
+                      transition={reduce ? undefined : listTransition}
+                    >
+                      {n.displayName} — {n.votes} vote{n.votes === 1 ? '' : 's'}
+                      {captainVote.myVote === n.userId ? (
+                        ' · your vote'
+                      ) : (
+                        <button
+                          type="button"
+                          className="vl-btn vl-btn--ghost vl-btn--sm"
+                          onClick={() => voteCaptain(n.userId)}
+                          disabled={busy}
+                        >
+                          Vote
+                        </button>
+                      )}
+                    </m.li>
+                  ))}
+              </AnimatePresence>
+            </ul>
+          )}
+        </>
+      )
+    ) : (
+      <p className="vl-step__lead">Captain: {captainName ?? '—'}</p>
+    )
+  );
 
-      {team.status === 'PUBLISHED' && (
-        <section className="queue-state">
-          <h2>Published 🎉</h2>
-          {!showcase ? (
-            <>
-              <p>
-                The team voted to publish. Fill in the public entry — any member can publish it.
+  const step4 = ledgerStep(
+    4,
+    team.status === 'FAILED' ? (
+      <>
+        <p>
+          The 72-hour deadline passed without a submission, so this session has ended. No penalty —
+          you can jump back into the queue.
+        </p>
+        <div className="vl-actions">
+          <button
+            type="button"
+            className="vl-btn vl-btn--primary"
+            onClick={requeueIndividually}
+            disabled={busy}
+          >
+            {busy ? 'Requeuing…' : 'Requeue individually'}
+          </button>
+        </div>
+      </>
+    ) : stepStateOf(4) === 'active' && mission ? (
+      <>
+        <p className="vl-step__lead">{mission.title}</p>
+        <p>{mission.brief}</p>
+        {team.status === 'CONTINUING' && (
+          <p>
+            Follow-up mission · proposed duration {Math.round(mission.durationHours / 24)} days. It
+            starts once the whole team approves it.
+          </p>
+        )}
+        {missionExpired && (
+          <p className="vl-error">
+            The deadline has passed. Unless a package is submitted, this mission will be marked
+            failed.
+          </p>
+        )}
+
+        <h3>Deliverables</h3>
+        <ul className="vl-list">
+          {mission.assignments.map((a, i) => (
+            <li key={i}>
+              <strong>{a.title}</strong> — {a.description} <span className="vl-chip">{a.assignedToName}</span>
+            </li>
+          ))}
+          {mission.assignments.length === 0 &&
+            mission.deliverables.map((d, i) => (
+              <li key={i}>
+                <strong>{d.title}</strong> — {d.description}
+              </li>
+            ))}
+        </ul>
+
+        <h3>Final submission</h3>
+        {isCaptain ? (
+          <div className="vl-form">
+            <label>
+              Summary *
+              <textarea
+                className="vl-input"
+                value={submitForm.summary}
+                onChange={setSubmitField('summary')}
+                rows={3}
+              />
+            </label>
+            <label>
+              Pitch
+              <textarea
+                className="vl-input"
+                value={submitForm.pitchText}
+                onChange={setSubmitField('pitchText')}
+                rows={2}
+              />
+            </label>
+            <label>
+              Prototype / demo URL
+              <input
+                className="vl-input"
+                value={submitForm.prototypeUrl}
+                onChange={setSubmitField('prototypeUrl')}
+                placeholder="https://"
+              />
+            </label>
+            <label>
+              Landing page URL
+              <input
+                className="vl-input"
+                value={submitForm.landingPageUrl}
+                onChange={setSubmitField('landingPageUrl')}
+                placeholder="https://"
+              />
+            </label>
+            <label>
+              File / resource links (one per line)
+              <textarea
+                className="vl-input"
+                value={submitForm.links}
+                onChange={setSubmitField('links')}
+                rows={2}
+              />
+            </label>
+            <label>
+              Notes
+              <textarea
+                className="vl-input"
+                value={submitForm.notes}
+                onChange={setSubmitField('notes')}
+                rows={2}
+              />
+            </label>
+            <div className="vl-actions">
+              <button
+                type="button"
+                className="vl-btn vl-btn--go"
+                onClick={submitMission}
+                disabled={busy || !submitForm.summary.trim()}
+              >
+                {busy ? 'Submitting…' : 'Submit final package →'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p>
+            Your captain submits the final package. Get your deliverables done and coordinate in
+            chat before the clock runs out.
+          </p>
+        )}
+        <p>
+          What happens next: when the captain submits, the package enters the anonymized VC review
+          queue. A reviewer scores it across five categories, then your team gets a 6-hour appeal
+          window before the score becomes final.
+        </p>
+      </>
+    ) : (
+      <p className="vl-step__lead">{mission?.title ?? 'Mission'} — final package submitted.</p>
+    )
+  );
+
+  const step5 = ledgerStep(
+    5,
+    stepStateOf(5) === 'active' ? (
+      <>
+        {team.status === 'SUBMITTED' && team.submission && (
+          <>
+            <p className="vl-step__lead">
+              {team.submission.reviewDelayed ? 'Review delayed' : 'Submitted — awaiting VC review'}
+            </p>
+            {team.submission.reviewDelayed && (
+              <p className="vl-error">
+                Your reviewer missed the 6-hour window, so the submission is back at the front of the
+                review queue. No action needed — the next available VC will pick it up.
               </p>
-              <div className="submit-form">
-                <label>
-                  Project name *
-                  <input value={publishForm.title} onChange={setPublishField('title')} maxLength={120} />
-                </label>
-                <label>
-                  Tagline *
-                  <input value={publishForm.tagline} onChange={setPublishField('tagline')} maxLength={160} />
-                </label>
-                <label>
-                  Short pitch *
-                  <textarea value={publishForm.shortPitch} onChange={setPublishField('shortPitch')} rows={3} />
-                </label>
-                <label>
-                  Prototype / demo URL *
-                  <input
-                    value={publishForm.prototypeUrl}
-                    onChange={setPublishField('prototypeUrl')}
-                    placeholder="https://"
-                  />
-                </label>
+            )}
+            <p>Submitted by {team.submission.submittedByName}.</p>
+            <p>
+              <strong>Summary:</strong> {team.submission.summary}
+            </p>
+            {team.submission.pitchText && (
+              <p>
+                <strong>Pitch:</strong> {team.submission.pitchText}
+              </p>
+            )}
+            {team.submission.prototypeUrl && (
+              <p>
+                Prototype / demo:{' '}
+                <a href={team.submission.prototypeUrl} target="_blank" rel="noreferrer">
+                  {team.submission.prototypeUrl}
+                </a>
+              </p>
+            )}
+            {team.submission.landingPageUrl && (
+              <p>
+                Landing page:{' '}
+                <a href={team.submission.landingPageUrl} target="_blank" rel="noreferrer">
+                  {team.submission.landingPageUrl}
+                </a>
+              </p>
+            )}
+            {team.submission.notes && (
+              <p>
+                <strong>Notes:</strong> {team.submission.notes}
+              </p>
+            )}
+          </>
+        )}
+
+        {/* Hidden in pre-review stages so a pivoted team's fresh round doesn't
+            show the previous round's review. */}
+        {team.reviews.length > 0 &&
+          !['LOBBY', 'IDEA_VOTING', 'CAPTAIN_VOTING', 'MISSION_ACTIVE'].includes(team.status) && (
+            <>
+              <h3>VC review</h3>
+              {team.status === 'APPEAL_WINDOW' && team.appealWindowExpiresAt && (
+                <p>
+                  ⏳ Appeal window closes in{' '}
+                  <span className="vl-mono">
+                    <Countdown to={team.appealWindowExpiresAt} format={formatRemaining} />
+                  </span>
+                </p>
+              )}
+
+              {team.status === 'APPEAL_WINDOW' && !appeal && team.submission && (
+                <>
+                  <div className="vl-actions">
+                    <button
+                      type="button"
+                      className="vl-btn vl-btn--primary"
+                      onClick={startAppeal}
+                      disabled={busy}
+                    >
+                      Start appeal
+                    </button>
+                  </div>
+                  <p>
+                    A score can be appealed once. The team then has 6 hours to approve the appeal by
+                    majority vote; if approved, a different VC reviews the submission blind.
+                  </p>
+                </>
+              )}
+
+              {appeal && appeal.status === 'OPEN' && !appealExpired && (
+                <>
+                  <p>
+                    <strong>Appeal vote open</strong>
+                  </p>
+                  <p>
+                    ⏳{' '}
+                    <span className="vl-mono">
+                      <Countdown to={appeal.expiresAt} format={formatRemaining} onExpire={forceRender} />
+                    </span>{' '}
+                    to reach a majority
+                  </p>
+                  <p>
+                    YES: {appeal.yesCount} · NO: {appeal.noCount} · Needed: {appeal.majorityNeeded}
+                  </p>
+                  <div className="vl-actions">
+                    <button
+                      type="button"
+                      className="vl-btn vl-btn--primary"
+                      onClick={() => voteAppeal('YES')}
+                      disabled={busy || appeal.myVote === 'YES'}
+                    >
+                      Vote YES{appeal.myVote === 'YES' ? ' ✓' : ''}
+                    </button>
+                    <button
+                      type="button"
+                      className="vl-btn vl-btn--ghost"
+                      onClick={() => voteAppeal('NO')}
+                      disabled={busy || appeal.myVote === 'NO'}
+                    >
+                      Vote NO{appeal.myVote === 'NO' ? ' ✓' : ''}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {appeal?.status === 'APPROVED' && (
+                <p>Appeal approved. The submission has been sent to a new reviewer.</p>
+              )}
+
+              {appeal &&
+                (appeal.status === 'REJECTED' || (appeal.status === 'OPEN' && appealExpired)) && (
+                  <p>Appeal closed. The first review is final.</p>
+                )}
+
+              {team.reviews.map((r, i) => (
+                <div key={i}>
+                  <h3>
+                    {r.isAppealReview ? 'Appeal review' : 'Review'} by {r.vcName} —{' '}
+                    {Math.round(r.overallScore)}/100
+                  </h3>
+                  <ul className="vl-list">
+                    {r.categories.map((c, j) => (
+                      <li key={j}>
+                        <strong>{c.category}:</strong> {c.score}/10 — {c.feedback}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+
+              {team.reviewFinal ? (
+                <>
+                  <p>
+                    <strong>Final score: {finalScoreText}</strong> (locked)
+                  </p>
+                  {team.status === 'REVIEW_FINAL' && (
+                    <div className="vl-actions">
+                      <button
+                        type="button"
+                        className="vl-btn vl-btn--primary"
+                        onClick={startContinuationVote}
+                        disabled={busy}
+                      >
+                        Start continuation vote
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p>Score is not final until the appeal window closes.</p>
+                  <p>🔒 The continuation vote is locked until the review is final.</p>
+                </>
+              )}
+            </>
+          )}
+
+        {team.status === 'CONTINUATION_VOTING' && continuation && (
+          <>
+            <h3>What's next? Team vote</h3>
+            <p>
+              Majority wins ({continuation.majorityNeeded} of {continuation.memberCount}). You can
+              change your vote until a majority is reached.
+            </p>
+            <ul className="vl-list">
+              {CONTINUATION_OPTIONS.map((opt) => {
+                const tally = continuation.tallies.find((t) => t.choice === opt.choice)?.votes ?? 0;
+                const mine = continuation.myChoice === opt.choice;
+                return (
+                  <li key={opt.choice}>
+                    <button
+                      type="button"
+                      className="vl-btn vl-btn--ghost vl-btn--sm"
+                      onClick={() => voteContinuation(opt.choice)}
+                      disabled={busy || mine}
+                    >
+                      {opt.label}
+                    </button>{' '}
+                    — {tally} vote{tally === 1 ? '' : 's'}
+                    {mine && ' · your vote'}
+                    <div>{opt.hint}</div>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+      </>
+    ) : (
+      <p className="vl-step__lead">Final score: {finalScoreText}</p>
+    )
+  );
+
+  const step6 = ledgerStep(
+    6,
+    team.status === 'DISBANDED' ? (
+      <>
+        <p>
+          The team disbanded privately — nothing is published. No penalty; requeue whenever you
+          like.
+        </p>
+        <div className="vl-actions">
+          <button
+            type="button"
+            className="vl-btn vl-btn--primary"
+            onClick={requeueIndividually}
+            disabled={busy}
+          >
+            {busy ? 'Requeuing…' : 'Requeue individually'}
+          </button>
+        </div>
+      </>
+    ) : team.status === 'PUBLISHED' ? (
+      <>
+        {!showcase ? (
+          <>
+            <p>The team voted to publish. Fill in the public entry — any member can publish it.</p>
+            <div className="vl-form">
+              <label>
+                Project name *
+                <input
+                  className="vl-input"
+                  value={publishForm.title}
+                  onChange={setPublishField('title')}
+                  maxLength={120}
+                />
+              </label>
+              <label>
+                Tagline *
+                <input
+                  className="vl-input"
+                  value={publishForm.tagline}
+                  onChange={setPublishField('tagline')}
+                  maxLength={160}
+                />
+              </label>
+              <label>
+                Short pitch *
+                <textarea
+                  className="vl-input"
+                  value={publishForm.shortPitch}
+                  onChange={setPublishField('shortPitch')}
+                  rows={3}
+                />
+              </label>
+              <label>
+                Prototype / demo URL *
+                <input
+                  className="vl-input"
+                  value={publishForm.prototypeUrl}
+                  onChange={setPublishField('prototypeUrl')}
+                  placeholder="https://"
+                />
+              </label>
+              <div className="vl-actions">
                 <button
                   type="button"
+                  className="vl-btn vl-btn--go"
                   onClick={publishShowcase}
                   disabled={
                     busy ||
@@ -1210,168 +1365,191 @@ export default function TeamPage() {
                     !publishForm.prototypeUrl.trim()
                   }
                 >
-                  {busy ? 'Publishing…' : 'Publish to showcase'}
+                  {busy ? 'Publishing…' : 'Publish to showcase →'}
                 </button>
               </div>
-              <p className="placeholder">
-                The public page shows the name, tagline, pitch, demo link, the raw final score,
-                and only the members who opt in. VC feedback and category scores stay private.
-              </p>
-            </>
-          ) : (
-            <>
-              <p>
-                <strong>{showcase.title}</strong> is live in the public showcase with a score of{' '}
-                <strong>{showcase.finalScore}/100</strong>.
-              </p>
-              <p>
-                Attribution is personal:{' '}
-                {showcase.myVisible ? 'your name is currently shown.' : 'you are currently hidden.'}
-              </p>
-              <div className="vote-actions">
-                <button
-                  type="button"
-                  onClick={() => setAttribution(true)}
-                  disabled={busy || showcase.myVisible === true}
-                >
-                  Show my name
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAttribution(false)}
-                  disabled={busy || showcase.myVisible === false}
-                  className="link-button"
-                >
-                  Hide me
-                </button>
-              </div>
-              <ul className="party-members">
-                {showcase.attributions.map((a) => (
-                  <li key={a.userId}>
-                    {a.displayName}: {a.visible ? 'shown' : 'hidden'}
-                    {a.userId === team.currentUserId && <span className="badge"> · you</span>}
-                  </li>
-                ))}
-              </ul>
-              <p>
-                <Link to="/showcase">View the public showcase</Link>
-              </p>
-            </>
-          )}
-          <button type="button" onClick={requeueIndividually} disabled={busy}>
-            {busy ? 'Requeuing…' : 'Requeue individually'}
-          </button>
-        </section>
-      )}
-
-      {team.status === 'DISBANDED' && (
-        <section className="queue-state">
-          <h2>Session ended</h2>
-          <p>
-            The team disbanded privately — nothing is published. No penalty; requeue whenever you
-            like.
-          </p>
-          <button type="button" onClick={requeueIndividually} disabled={busy}>
-            {busy ? 'Requeuing…' : 'Requeue individually'}
-          </button>
-        </section>
-      )}
-
-          <Toast message={error} tone="error" onClose={() => setError(null)} />
-
-          {(inLobby ||
-            team.status === 'REVIEW_FINAL' ||
-            team.status === 'CONTINUATION_VOTING') && (
-            <button type="button" onClick={leaveTeam} disabled={busy} className="link-button">
-              {inLobby ? 'Leave team' : 'Leave team (no penalty)'}
-            </button>
-          )}
-        </main>
-
-        <aside className="team-col team-col--right">
-          <section className="queue-state team-side-card">
-            <h2>Mission status</h2>
-            <StatePill state={STATUS_PILL[team.status] ?? 'active'} label={statusMeta.label} />
-            {team.reviewFinal && (
-              <p>
-                <strong>
-                  Final score: {team.finalScore != null ? Math.round(team.finalScore) : '—'}/100
-                </strong>
-              </p>
-            )}
-            {inLobby && (
-              <p className="placeholder">
-                {team.members.filter((m) => m.ready).length} of {team.members.length} ready
-              </p>
-            )}
-          </section>
-
-          <section className="queue-state chat">
-            <h2>Chat</h2>
-            <div className="chat-log">
-              <EmptyState show={messages.length === 0} kicker="Team chat">
-                Quiet so far — introduce yourself and claim a deliverable.
-              </EmptyState>
-              {messages.length > 0 && (
-                <AnimatePresence initial={false}>
-                  {messages.map((msg) => {
-                    // Only YOUR optimistic message (temp id) animates its landing;
-                    // polled messages render in place — matching the optimistic
-                    // doctrine of animating your own action's local appearance.
-                    const optimistic = msg.id.startsWith('temp-');
-                    return (
-                      <m.div
-                        key={msg.id}
-                        className="chat-line"
-                        layout={!reduce}
-                        initial={reduce || !optimistic ? false : listEnter}
-                        animate={reduce ? undefined : listShown}
-                        exit={reduce ? undefined : listExit}
-                        transition={reduce ? undefined : listTransition}
-                      >
-                        <strong>{msg.displayName}:</strong> {msg.body}
-                        {pending.includes(msg.id) && (
-                          <span className="placeholder"> · sending…</span>
-                        )}
-                      </m.div>
-                    );
-                  })}
-                </AnimatePresence>
-              )}
-              <div ref={chatEndRef} />
             </div>
-            <form onSubmit={sendMessage} className="chat-form">
-              <input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder="Message your team…"
-                maxLength={2000}
-              />
-              <Tooltip label="Send message">
-                <button
-                  type="submit"
-                  className="icon-btn icon-btn--primary"
-                  disabled={!draft.trim()}
-                  aria-label="Send message"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
+            <p>
+              The public page shows the name, tagline, pitch, demo link, the raw final score, and
+              only the members who opt in. VC feedback and category scores stay private.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="vl-step__lead">
+              {showcase.title} is live with a score of {showcase.finalScore}/100.
+            </p>
+            <p>
+              Attribution is personal:{' '}
+              {showcase.myVisible ? 'your name is currently shown.' : 'you are currently hidden.'}
+            </p>
+            <div className="vl-actions">
+              <button
+                type="button"
+                className="vl-btn vl-btn--primary"
+                onClick={() => setAttribution(true)}
+                disabled={busy || showcase.myVisible === true}
+              >
+                Show my name
+              </button>
+              <button
+                type="button"
+                className="vl-btn vl-btn--ghost"
+                onClick={() => setAttribution(false)}
+                disabled={busy || showcase.myVisible === false}
+              >
+                Hide me
+              </button>
+            </div>
+            <ul className="vl-list">
+              {showcase.attributions.map((a) => (
+                <li key={a.userId}>
+                  {a.displayName}: {a.visible ? 'shown' : 'hidden'}
+                  {a.userId === team.currentUserId && ' · you'}
+                </li>
+              ))}
+            </ul>
+            <p>
+              <Link to="/showcase">View the public showcase</Link>
+            </p>
+          </>
+        )}
+        <div className="vl-actions">
+          <button
+            type="button"
+            className="vl-btn vl-btn--ghost"
+            onClick={requeueIndividually}
+            disabled={busy}
+          >
+            {busy ? 'Requeuing…' : 'Requeue individually'}
+          </button>
+        </div>
+      </>
+    ) : (
+      <p>Ships to the public showcase once the review is settled and the team votes to publish.</p>
+    )
+  );
+
+  const canLeave =
+    inLobby || team.status === 'REVIEW_FINAL' || team.status === 'CONTINUATION_VOTING';
+
+  return (
+    <div className="page team-page lake-scope">
+      <header className="vl-band">
+        <div>
+          <StatePill state={STATUS_PILL[team.status] ?? 'active'} label={statusMeta.label} />
+          <h1 className="vl-band__title">{inLobby ? 'The Lobby' : 'The Mission'}</h1>
+          <p className="vl-band__data">
+            {team.members.length} founders · stage {pad2(currentStep)}/06 · captain:{' '}
+            <b>{captainName ?? 'TBD'}</b>
+          </p>
+          <div className="vl-avatars" aria-hidden="true">
+            {team.members.map((mem) => (
+              <span
+                key={mem.userId}
+                className="vl-avatars__a"
+                data-captain={mem.isCaptain}
+                title={mem.displayName}
+              >
+                {mem.displayName.slice(0, 2)}
+              </span>
+            ))}
+          </div>
+        </div>
+        {showTimer && team.missionDeadlineAt && (
+          <div className="vl-clock">
+            <div className="vl-clock__t">
+              <Countdown to={team.missionDeadlineAt} format={formatRemaining} onExpire={forceRender} />
+            </div>
+            <div className="vl-clock__l">{missionExpired ? 'Deadline passed' : 'Time remaining'}</div>
+          </div>
+        )}
+      </header>
+
+      <ol className="vl-ledger">
+        {step1}
+        {step2}
+        {step3}
+        {step4}
+        {step5}
+        {step6}
+      </ol>
+
+      <section className="vl-chatstrip">
+        <h2 className="vl-step__title">Team chat</h2>
+        <div className="vl-chatstrip__log">
+          <EmptyState show={messages.length === 0} kicker="Team chat">
+            Quiet so far — introduce yourself and claim a deliverable.
+          </EmptyState>
+          {messages.length > 0 && (
+            <AnimatePresence initial={false}>
+              {messages.map((msg) => {
+                // Only YOUR optimistic message (temp id) animates its landing;
+                // polled messages render in place — matching the optimistic
+                // doctrine of animating your own action's local appearance.
+                const optimisticMsg = msg.id.startsWith('temp-');
+                return (
+                  <m.div
+                    key={msg.id}
+                    className="vl-chatstrip__line"
+                    layout={!reduce}
+                    initial={reduce || !optimisticMsg ? false : listEnter}
+                    animate={reduce ? undefined : listShown}
+                    exit={reduce ? undefined : listExit}
+                    transition={reduce ? undefined : listTransition}
                   >
-                    <path d="m22 2-7 20-4-9-9-4Z" />
-                    <path d="M22 2 11 13" />
-                  </svg>
-                </button>
-              </Tooltip>
-            </form>
-          </section>
-        </aside>
-      </div>
+                    <strong>{msg.displayName}:</strong> {msg.body}
+                    {pending.includes(msg.id) && <span> · sending…</span>}
+                  </m.div>
+                );
+              })}
+            </AnimatePresence>
+          )}
+          <div ref={chatEndRef} />
+        </div>
+        <form onSubmit={sendMessage} className="vl-chatstrip__form">
+          <input
+            className="vl-input"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Message your team…"
+            maxLength={2000}
+          />
+          <Tooltip label="Send message">
+            <button
+              type="submit"
+              className="vl-btn vl-btn--primary vl-chatstrip__send"
+              disabled={!draft.trim()}
+              aria-label="Send message"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m22 2-7 20-4-9-9-4Z" />
+                <path d="M22 2 11 13" />
+              </svg>
+            </button>
+          </Tooltip>
+        </form>
+      </section>
+
+      {canLeave && (
+        <div className="vl-teamfoot">
+          <button type="button" className="vl-btn vl-btn--ghost" onClick={leaveTeam} disabled={busy}>
+            {inLobby ? 'Leave team' : 'Leave team (no penalty)'}
+          </button>
+        </div>
+      )}
+
+      <Toast message={error} tone="error" onClose={() => setError(null)} />
     </div>
   );
 }

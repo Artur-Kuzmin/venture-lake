@@ -79,6 +79,8 @@
   --vl-green: #1fbf4b;        /* GO / success — FILL ONLY (1.95:1 as text on paper, fails AA) */
   --vl-green-text: #166534;   /* green TEXT on paper (5.71:1, passes AA) */
   --vl-green-ink: #06250f;    /* text ON green fills (6.8:1 on --vl-green) */
+  --vl-danger: #b3261e;       /* error / blocked — AA on paper */
+  --vl-blue-lift: #8c93ff;    /* blue accent for text/links ON the inverted ink block */
 
   --vl-border: #0a0a0a;       /* always solid; 2px structural, 1px internal */
 
@@ -92,40 +94,6 @@
 
   --vl-fd: 'Archivo', system-ui, sans-serif;       /* display + body */
   --vl-fm: 'Space Mono', ui-monospace, monospace;  /* data, labels, clock */
-
-  /* ----------------------------------------------------------------------
-     TEMPORARY legacy-alias bridge. The .lake-scope / .vl-* rules further down
-     still reference the OLD Lake token names; these aliases re-point them onto
-     the Concrete palette so the Team surface re-skins to concrete WITHOUT a
-     markup change (Pass 1 = tokens only, §8.1, "low structural risk"). Passes
-     2–3 rewrite those consumers to the canonical names above and DELETE this
-     block. Do not add new uses of these names.
-     ---------------------------------------------------------------------- */
-  --vl-surface: var(--vl-paper);
-  --vl-surface-raised: var(--vl-paper);
-  --vl-surface-sunk: var(--vl-paper-2);
-  --vl-ink-muted: var(--vl-muted);
-  --vl-ink-faint: var(--vl-faint);
-  --vl-line: var(--vl-ink);          /* old 1px card edges → crisp ink */
-  --vl-line-strong: var(--vl-ink);
-  --vl-edge-hi: var(--vl-ink);       /* kill the fake top-highlight; uniform border */
-  --vl-lake: var(--vl-blue);         /* brand interactive: teal → blue */
-  --vl-lake-strong: var(--vl-blue);
-  --vl-lake-tint: var(--vl-paper-2);
-  --vl-lake-ring: var(--vl-blue);    /* solid 2px focus ring */
-  --vl-ember: var(--vl-green);       /* commit/launch action → green "go" */
-  --vl-ember-tint: var(--vl-paper-2);
-  --vl-ok: var(--vl-green);
-  --vl-warn: #8a5a00;                /* dark amber — AA on paper */
-  --vl-danger: #b3261e;              /* dark red — AA on paper */
-  --vl-shadow-pop: var(--vl-shadow); /* the one soft shadow → hard offset */
-  --vl-r-sm: var(--vl-radius);
-  --vl-r-md: var(--vl-radius);
-  --vl-r-lg: var(--vl-radius);
-  --vl-r-pill: var(--vl-radius);
-  --vl-font-display: var(--vl-fd);
-  --vl-font-body: var(--vl-fd);      /* Archivo carries body too (§2.2) */
-  --vl-font-mono: var(--vl-fm);
 
   /* Motion — retuned to brutalist hard/fast in a later pass (§5) */
   --vl-ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -339,269 +307,395 @@
 }
 
 /* ==========================================================================
-   Lake applied to ONE screen — the Team workspace (Pass 3). Scoped under
-   .lake-scope so it re-skins only this screen's legacy classes to Lake tokens;
-   no other screen changes. The status chips are the real <StatePill> component
-   in the markup; everything else is token-mapped here.
+   Concrete — the Team mission ledger (§3). .lake-scope is now JUST the surface
+   + namespace: the Pass 1/2 legacy-alias bridge and the legacy-class re-skin are
+   gone (Pass 3). Canonical --vl-* tokens only; the Team markup uses .vl-* /
+   .vl-ledger classes. .vl-toast / .vl-empty (kept below) are scoped here only
+   because the components render inside .lake-scope.
    ========================================================================== */
 .lake-scope {
   color: var(--vl-ink);
-  /* Pass 1: paint the in-scope surface concrete. Without this the re-tokenized
-     light cards would float on the still-dark app body (the shell converts in
-     Pass 5). color-scheme:light makes native controls (selects) render light. */
   background: var(--vl-paper);
   font-family: var(--vl-fd);
   color-scheme: light;
-
-  /* Re-point the LEGACY dark tokens to Concrete, scoped to the Team route. Much
-     of this screen still renders through legacy classes bound to the dark
-     --bg/--text/--accent/--border tokens (built for the dark shell); without
-     this remap they wash out or stay dark on paper. Scoping the legacy names
-     here re-tokenizes the whole in-scope surface at once — every state, no
-     markup change. Passes 2–3 rewrite the markup to --vl-* + real primitives
-     and this remap is deleted. */
-  --bg: var(--vl-paper);
-  --bg-sunken: var(--vl-paper-2);
-  --surface: var(--vl-paper);
-  --surface-2: var(--vl-paper-2);
-  --surface-3: var(--vl-paper-2);
-  --text: var(--vl-ink);
-  --text-muted: var(--vl-muted);
-  --text-subtle: var(--vl-muted); /* collapse tertiary→muted for AA; faint is locked-only in Concrete */
-  --border: var(--vl-ink);
-  --border-strong: var(--vl-ink);
-  --accent: var(--vl-blue);
-  --accent-hover: var(--vl-blue);
-  --accent-strong: var(--vl-blue);
-  --accent-weak: var(--vl-paper-2);
-  --ring: var(--vl-blue);
-  --success: var(--vl-green);
-  --success-weak: var(--vl-paper-2);
-  --danger: #b3261e;          /* dark red — AA on paper */
-  --danger-weak: var(--vl-paper-2);
-  --warning: #8a5a00;         /* dark amber — AA on paper */
-  --warning-weak: var(--vl-paper-2);
-  --radius: 0;
-  --radius-sm: 0;
-  --radius-lg: 0;
-  /* Concrete uses borders, not soft shadows — null the legacy blurred shadows
-     (kept as transparent no-ops so the comma-lists they sit in stay valid). */
-  --shadow-sm: 0 0 transparent;
-  --shadow-md: 0 0 transparent;
-  --inner-hi: 0 0 transparent;
-  --glow-accent: 0 0 transparent;
-  --mono: var(--vl-fm);
 }
 .lake-scope h1,
 .lake-scope h2,
 .lake-scope h3 {
   font-family: var(--vl-fd);
-  /* Pass 1: the legacy global `h1,h2,h3 { color: var(--text) }` (near-white, for
-     the dark shell) wins over .lake-scope's inherited ink and renders headings
-     invisible on paper. Force concrete ink within scope. */
   color: var(--vl-ink);
-}
-.lake-scope .placeholder,
-.lake-scope .match-explanation {
-  color: var(--vl-ink-muted);
 }
 .lake-scope a {
-  color: var(--vl-lake);
+  color: var(--vl-blue);
+  font-weight: 600;
 }
 
-/* Pass 1 — fix the few HARDCODED (non-token) legacy effects the scoped remap
-   above can't reach: a blurred blue text-glow on the timer (§6 bans soft
-   shadows) and the rounded-pill radius on the owner / category tags. Everything
-   else re-skins through the scoped legacy tokens. Deleted in Passes 2–3. */
-.lake-scope .timer {
-  text-shadow: none;
+/* Header band (§4 — full hero/clock polish lands in Pass 4): status kicker +
+   hero + square overlapping member avatars, and the clock for a running mission. */
+.vl-band {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 30px;
+  flex-wrap: wrap;
+  padding: 32px 40px;
+  border-bottom: 2px solid var(--vl-ink);
 }
-.lake-scope .mw-timer .timer {
-  animation: none; /* drop the legacy blue glow-pulse */
+.vl-band__title {
+  font-size: clamp(40px, 6vw, 60px);
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  font-weight: 900;
+  margin: 10px 0 0;
 }
-.lake-scope .mw-owner,
-.lake-scope p.badge {
-  border: 1px solid var(--vl-line);
-  border-radius: var(--vl-radius);
+.vl-band__data {
   font-family: var(--vl-fm);
-  color: var(--vl-ink-muted);
-}
-
-/* Cards — Lake surface, borders only, NO shadow (§3). Keep the legacy layout +
-   child styling; only the surface is re-skinned. */
-.lake-scope .queue-state {
-  background: var(--vl-surface);
-  border-color: var(--vl-line);
-  border-top-color: var(--vl-edge-hi);
-  border-radius: var(--vl-r-lg);
-  box-shadow: none;
-}
-.lake-scope .queue-state:hover {
-  border-color: var(--vl-line-strong);
-  border-top-color: var(--vl-edge-hi);
-  box-shadow: none;
-}
-/* Elevation (§4): the center column is the workspace's primary panel — lift it
-   one surface step above the rails so ONE panel dominates instead of a grid of
-   equal boxes. Tone + borders only, no shadow. */
-.lake-scope .team-col--center > section.queue-state {
-  background: var(--vl-surface-raised);
-  border-color: var(--vl-line-strong);
-  border-top-color: var(--vl-edge-hi);
-}
-/* Recessed surfaces sit BELOW the panel: the chat transcript reads as an inset
-   well (form fields get the same treatment in the inputs block below). */
-.lake-scope .chat-log {
-  background: var(--vl-surface-sunk);
-  border-color: var(--vl-line);
-}
-/* Sunk well (mission timer) — differentiate panels without competing shadows;
-   drop the legacy brand-tinted border/glow (§8). */
-.lake-scope .mw-timer {
-  background: var(--vl-surface-sunk);
-  border-color: var(--vl-line);
-  box-shadow: none;
-}
-
-/* Buttons (§4/§5) — live Team re-skin, mirroring the .vl-btn primitive until the
-   markup migrates to .vl-btn in Pass 3 (then this whole block is deleted). The
-   generic button = primary (paper / ink / blue hard shadow); .link-button = ghost
-   (bordered); .vl-ember-action = go (green fill / green-ink text / paper shadow —
-   this fixes Pass 1's white-on-green). All square, uppercase 800, press-into-shadow. */
-.lake-scope button:not(.link-button):not(.icon-btn):not(.vl-ember-action) {
-  background: var(--vl-paper);
-  color: var(--vl-ink);
-  border: 2px solid var(--vl-ink);
-  border-radius: 0;
-  min-height: 44px;
-  font-family: var(--vl-fd);
-  font-weight: 800;
+  font-size: 12.5px;
+  font-weight: 700;
   letter-spacing: 0.02em;
-  text-transform: uppercase;
-  box-shadow: var(--vl-shadow-blue);
-  transition: transform 120ms linear, box-shadow 120ms linear, background-color 120ms linear;
+  color: var(--vl-muted);
+  margin: 14px 0 0;
 }
-.lake-scope button:not(.link-button):not(.icon-btn):not(.vl-ember-action):hover:not(:disabled) {
-  background: var(--vl-paper);
-  transform: translate(2px, 2px);
-  box-shadow: 2px 2px 0 var(--vl-blue);
-}
-.lake-scope button:not(.link-button):not(.icon-btn):not(.vl-ember-action):active:not(:disabled) {
-  transform: translate(4px, 4px);
-  box-shadow: 0 0 transparent;
-}
-.lake-scope .link-button {
-  background: transparent;
-  color: var(--vl-ink);
-  border: 2px solid var(--vl-ink);
-  border-radius: 0;
-  min-height: 44px;
-  font-family: var(--vl-fd);
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  transition: transform 120ms linear, background-color 120ms linear, color 120ms linear;
-}
-.lake-scope .link-button:hover:not(:disabled) {
-  background: var(--vl-paper-2);
+.vl-band__data b {
   color: var(--vl-ink);
 }
-.lake-scope .link-button:active:not(:disabled) {
-  transform: translate(2px, 2px);
+.vl-avatars {
+  display: flex;
+  margin: 16px 0 0;
 }
-/* The single commit/execute action (§4): start the 72-hour mission — the GO button. */
-.lake-scope .vl-ember-action {
-  background: var(--vl-green);
-  color: var(--vl-green-ink);
-  border: 2px solid var(--vl-green-ink);
-  border-radius: 0;
-  min-height: 44px;
-  font-family: var(--vl-fd);
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  box-shadow: var(--vl-shadow-paper);
-  transition: transform 120ms linear, box-shadow 120ms linear;
-}
-.lake-scope .vl-ember-action:hover:not(:disabled) {
-  background: var(--vl-green);
-  filter: none;
-  transform: translate(2px, 2px);
-  box-shadow: 2px 2px 0 var(--vl-paper);
-}
-.lake-scope .vl-ember-action:active:not(:disabled) {
-  transform: translate(4px, 4px);
-  box-shadow: 0 0 transparent;
-}
-/* Press interaction gated behind reduced-motion (§4/§5) — the depth (shadow)
-   stays, but the element does not physically shift. */
-@media (prefers-reduced-motion: reduce) {
-  .vl-btn:hover, .vl-btn:active,
-  .vl-card--interactive:hover,
-  .lake-scope button:hover, .lake-scope button:active,
-  .lake-scope .link-button:hover, .lake-scope .link-button:active,
-  .lake-scope .vl-ember-action:hover, .lake-scope .vl-ember-action:active {
-    transform: none;
-  }
-}
-
-/* Inputs (§4) — square, 2px ink border, paper-2 surface. Text inputs + textareas
-   keep Archivo sentence-case (§6: reading/body text is never mono/uppercase).
-   Selects are DATA controls, so they flip to mono uppercase (§4). */
-.lake-scope input,
-.lake-scope select,
-.lake-scope textarea {
+.vl-avatars__a {
+  width: 38px;
+  height: 38px;
+  margin-right: -8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--vl-paper-2);
   border: 2px solid var(--vl-ink);
-  border-radius: 0;
   color: var(--vl-ink);
-  font-family: var(--vl-fd);
+  font-family: var(--vl-fm);
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
 }
-.lake-scope select {
+.vl-avatars__a[data-captain='true'] {
+  background: var(--vl-blue);
+  color: var(--vl-paper);
+}
+.vl-clock {
+  flex: none;
+  text-align: center;
+  border: 2px solid var(--vl-ink);
+  background: var(--vl-paper);
+  padding: 12px 16px;
+  box-shadow: var(--vl-shadow);
+}
+.vl-clock__t {
+  font-family: var(--vl-fm);
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.vl-clock__l {
+  font-family: var(--vl-fm);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--vl-muted);
+  margin-top: 4px;
+}
+
+/* The ledger (§3) — vertical, steps butt together: a 96px bordered number column
+   + body, a 2px bottom border per step, no gaps/no floating cards. */
+.vl-ledger {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.vl-step {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  border-bottom: 2px solid var(--vl-ink);
+}
+.vl-step__num {
+  font-weight: 900;
+  font-size: 34px;
+  line-height: 1;
+  padding: 22px 0 22px 40px;
+  border-right: 2px solid var(--vl-ink);
+  font-variant-numeric: tabular-nums;
+  color: var(--vl-ink);
+}
+.vl-step__body {
+  padding: 22px 40px;
+  min-width: 0;
+}
+.vl-step__kicker {
+  font-family: var(--vl-fm);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.vl-step__kicker--done {
+  color: var(--vl-green-text);
+}
+.vl-step__kicker--blocked {
+  color: var(--vl-danger);
+}
+.vl-step__kicker--locked {
+  color: var(--vl-faint);
+}
+.vl-step__kicker--live {
+  background: var(--vl-blue);
+  color: var(--vl-paper);
+  padding: 2px 8px;
+}
+.vl-step__title {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  margin: 7px 0 0;
+}
+.vl-step__lead {
+  font-size: 18px;
+  line-height: 1.3;
+  font-weight: 800;
+  color: var(--vl-ink);
+  margin: 8px 0 0;
+}
+
+/* done = quiet (muted number); locked = faint, inert. */
+.vl-step--done .vl-step__num {
+  color: var(--vl-muted);
+}
+.vl-step--locked .vl-step__num,
+.vl-step--locked .vl-step__title {
+  color: var(--vl-faint);
+}
+
+/* active = THE one inverted block (§3): blue number cell, ink body, paper text. */
+.vl-step--active .vl-step__num {
+  background: var(--vl-blue);
+  color: var(--vl-paper);
+}
+.vl-step--active .vl-step__body {
+  background: var(--vl-ink);
+  color: var(--vl-paper);
+}
+.vl-step--active .vl-step__title,
+.vl-step--active .vl-step__lead {
+  color: var(--vl-paper);
+}
+
+/* step content — canonical tokens, no legacy classes. */
+.vl-step__body p {
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--vl-muted);
+  margin: 7px 0 0;
+  max-width: 640px;
+}
+.vl-step__body strong {
+  color: var(--vl-ink);
+  font-weight: 700;
+}
+.vl-step__body h3 {
+  font-family: var(--vl-fm);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vl-muted);
+  margin: 20px 0 8px;
+}
+.vl-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14.5px;
+}
+.vl-list strong {
+  color: var(--vl-ink);
+}
+.vl-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+.vl-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+  max-width: 640px;
+}
+.vl-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--vl-fm);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vl-muted);
+}
+.vl-form .vl-input {
+  width: 100%;
+}
+.vl-chip {
+  display: inline-block;
+  font-family: var(--vl-fm);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: 2px solid var(--vl-ink);
+  padding: 1px 7px;
+  margin-top: 8px;
+  color: var(--vl-ink);
+}
+.vl-error {
+  color: var(--vl-danger);
+  font-size: 13.5px;
+  margin-top: 8px;
+}
+/* Inline mono for in-flow data (countdowns, scores) — §1 data is load-bearing mono. */
+.vl-mono {
+  font-family: var(--vl-fm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+/* Smaller button for inline list actions (vote, continuation choice). */
+.vl-btn--sm {
+  min-height: 34px;
+  padding: 7px 12px;
+  font-size: 12px;
+}
+.vl-list li .vl-btn--sm {
+  margin: 4px 0 4px 12px;
+  vertical-align: middle;
+}
+
+/* selects are data controls → mono uppercase (§4); text inputs/textareas stay
+   Archivo sentence-case (§6, handled by the .vl-input primitive). */
+select.vl-input {
   font-family: var(--vl-fm);
   text-transform: uppercase;
   letter-spacing: 0.02em;
   font-weight: 700;
 }
-.lake-scope ::placeholder {
+
+/* inverted-context flips (§4): on the ink active body, fields / ghost buttons /
+   text / chips flip to paper; links use the lifted blue for contrast on ink. */
+.vl-step--active .vl-step__body p {
+  color: var(--vl-paper-2);
+}
+.vl-step--active .vl-step__body strong {
+  color: var(--vl-paper);
+}
+.vl-step--active .vl-step__body h3,
+.vl-step--active .vl-form label {
+  color: var(--vl-paper-2);
+}
+.vl-step--active a {
+  color: var(--vl-blue-lift);
+}
+.vl-step--active .vl-input {
+  background: transparent;
+  border-color: var(--vl-paper);
+  color: var(--vl-paper);
+}
+.vl-step--active .vl-input::placeholder {
   color: var(--vl-faint);
 }
-/* Focus = 2px+ offset outline (§6 a11y floor) instead of a soft ring. */
-.lake-scope input:focus,
-.lake-scope select:focus,
-.lake-scope textarea:focus,
-.lake-scope button:focus-visible,
-.lake-scope .icon-btn:focus-visible {
-  outline: 2px solid var(--vl-blue);
-  outline-offset: 2px;
+.vl-step--active .vl-chip {
+  border-color: var(--vl-paper);
+  color: var(--vl-paper);
+}
+.vl-step--active .vl-btn--ghost {
+  background: transparent;
+  border-color: var(--vl-paper);
+  color: var(--vl-paper);
+}
+.vl-step--active .vl-btn--ghost:hover:not(:disabled) {
+  background: rgba(233, 230, 221, 0.12);
+}
+.vl-step--active .vl-btn:focus-visible,
+.vl-step--active .vl-input:focus {
+  outline-color: var(--vl-blue-lift);
 }
 
-/* Badges → Lake mono chips (§2.3). */
-.lake-scope .badge {
-  background: var(--vl-surface-sunk);
-  color: var(--vl-ink-muted);
-  border-radius: var(--vl-r-sm);
-  font-family: var(--vl-font-mono);
+/* Chat strip (§3) — a single bordered strip, deliberately lighter than the ledger. */
+.vl-chatstrip {
+  border-bottom: 2px solid var(--vl-ink);
+  padding: 20px 40px;
+}
+.vl-chatstrip__log {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vl-chatstrip__line {
+  font-size: 14px;
+  line-height: 1.45;
+}
+.vl-chatstrip__line strong {
+  color: var(--vl-blue);
+  font-weight: 700;
+}
+.vl-chatstrip__form {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+}
+.vl-chatstrip__form .vl-input {
+  flex: 1;
+}
+.vl-chatstrip__send {
+  flex: none;
+  width: 44px;
+  padding: 0;
+}
+.vl-teamfoot {
+  padding: 20px 40px;
 }
 
-/* Data is load-bearing mono (§1): timers + mono labels. */
-.lake-scope .timer,
-.lake-scope .qt-mono {
-  font-family: var(--vl-font-mono);
+/* Press interaction gated behind reduced-motion (§4/§5) — depth (shadow) stays,
+   the element does not physically shift. Canonical primitives only now. */
+@media (prefers-reduced-motion: reduce) {
+  .vl-btn:hover,
+  .vl-btn:active,
+  .vl-card--interactive:hover {
+    transform: none;
+  }
+}
+/* The Team route still loads the dark-shell global stylesheet; null its hover
+   glow on canonical buttons that don't set their own shadow (ghost). */
+.lake-scope .vl-btn:hover {
+  box-shadow: none;
+}
+.lake-scope .vl-btn--primary:hover:not(:disabled) {
+  box-shadow: 2px 2px 0 var(--vl-blue);
+}
+.lake-scope .vl-btn--go:hover:not(:disabled) {
+  box-shadow: 2px 2px 0 var(--vl-paper);
 }
 
-/* Chat send icon-button adopts lake. */
-.lake-scope .icon-btn--primary {
-  background: var(--vl-lake);
-  border-color: transparent;
-}
-.lake-scope .icon-btn--primary:hover:not(:disabled) {
-  background: var(--vl-lake-strong);
-}
-
-/* Toast (§9.5) — floating action feedback. Fixed to the viewport, but a child of
-   .lake-scope so these scoped rules style it. A floating element earns the one
-   allowed shadow (--vl-shadow-pop); cards never do. Tone shows on a left accent. */
+/* Toast (§4) — floating action feedback. Fixed to the viewport, but a child of
+   .lake-scope so these scoped rules style it. Square, 2px border, hard --vl-shadow,
+   tone on a 6px left bar (blue/green/ink = info/success/error). */
 .lake-scope .vl-toast-region {
   position: fixed;
   right: 20px;
@@ -642,8 +736,9 @@
   flex: none;
   background: transparent;
   border: none;
-  border-radius: var(--vl-r-sm);
-  color: var(--vl-ink-faint);
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--vl-faint);
   padding: 2px;
   line-height: 0;
   cursor: pointer;
@@ -684,7 +779,7 @@
   font-family: var(--vl-fd);
   font-size: 14px;
   line-height: 1.5;
-  color: var(--vl-ink-muted);
+  color: var(--vl-muted);
 }
 
 * {
@@ -2156,212 +2251,9 @@ p.badge {
   }
 }
 
-/* Team workspace --------------------------------------------------------- */
-
-.team-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-  padding-bottom: 1.25rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.team-header h1 {
-  margin: 0.4rem 0 0.6rem;
-}
-
-.team-header__timer {
-  text-align: right;
-}
-
-.team-header__timer .qt-mono {
-  display: block;
-  margin-bottom: 0.2rem;
-}
-
-.team-grid {
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 320px;
-  gap: 1.25rem;
-  align-items: start;
-  margin-top: 1.5rem;
-}
-
-.team-col {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  min-width: 0;
-}
-
-.team-col .queue-state {
-  margin-top: 0;
-  max-width: none;
-  width: 100%;
-}
-
-.team-side-card .status {
-  align-self: flex-start;
-}
-
-.team-col--left .party-members li {
-  transition: color 0.15s ease;
-}
-
-/* Premium workspace chat */
-.team-col--right .chat {
-  max-width: none;
-}
-
-.chat-line {
-  line-height: 1.45;
-}
-
-.chat-line strong {
-  color: var(--accent-strong);
-  font-weight: 600;
-}
-
-@media (max-width: 1024px) {
-  .team-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .team-header__timer {
-    text-align: left;
-  }
-}
-
-/* Mission workspace (MISSION_ACTIVE) ------------------------------------- */
-
-.mission-workspace {
-  gap: 1.1rem;
-}
-
-.mw-head {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.mw-title {
-  font-size: clamp(1.5rem, 3vw, 2rem);
-  margin: 0.3rem 0 0;
-}
-
-.mw-brief {
-  color: var(--text-muted);
-  max-width: 640px;
-  margin: 0;
-}
-
-.mw-timer {
-  align-self: stretch;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  padding: 1rem 1.2rem;
-  border: 1px solid rgba(59, 130, 246, 0.35);
-  border-radius: var(--radius);
-  background: linear-gradient(180deg, var(--accent-weak), transparent);
-}
-
-.mw-timer .timer {
-  font-size: clamp(1.8rem, 5vw, 2.6rem);
-  animation: timer-pulse 2.4s ease-in-out infinite;
-}
-
-.mw-timer--over {
-  border-color: rgba(248, 113, 113, 0.4);
-  background: linear-gradient(180deg, var(--danger-weak), transparent);
-}
-
-.mw-timer--over .timer {
-  color: var(--danger);
-  text-shadow: none;
-  animation: none;
-}
-
-@keyframes timer-pulse {
-  0%,
-  100% {
-    text-shadow: 0 0 16px rgba(59, 130, 246, 0.22);
-  }
-  50% {
-    text-shadow: 0 0 28px rgba(59, 130, 246, 0.5);
-  }
-}
-
-.mw-section-title {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  margin: 0.4rem 0 0;
-}
-
-.mw-tasks {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 0.8rem;
-}
-
-.mw-task {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.9rem 1rem;
-}
-
-.mw-task strong {
-  font-size: 0.95rem;
-}
-
-.mw-task p {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 0.88rem;
-}
-
-.mw-owner {
-  align-self: flex-start;
-  margin-top: auto;
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-  background: var(--accent-weak);
-  border: 1px solid rgba(59, 130, 246, 0.25);
-  color: var(--accent-strong);
-  font-size: 0.76rem;
-  font-weight: 600;
-}
-
-.mw-submit {
-  width: 100%;
-  padding: 1.1rem 1.2rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-sunken);
-  transition: border-color 0.16s ease, box-shadow 0.16s ease;
-}
-
-.mw-submit:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--ring);
-}
-
-.mw-submit .submit-form {
-  margin-top: 0.6rem;
-}
-
-.mw-next {
-  width: 100%;
-  margin: 0;
-  padding-top: 0.9rem;
-  border-top: 1px solid var(--border);
-  font-size: 0.9rem;
-}
+/* Team + mission workspace layout — REMOVED in Pass 3. The Team route is the
+   mission ledger now (see the .vl-band / .vl-ledger / .vl-chatstrip rules above);
+   these legacy 3-column/.mw-* classes are no longer rendered. */
 
 /* VC review desk --------------------------------------------------------- */
 
