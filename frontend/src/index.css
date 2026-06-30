@@ -841,13 +841,15 @@ a:hover {
   min-height: 100vh;
 }
 
+/* Concrete shell — guest header (Pass 4, §4). Shell-only classes convert; the
+   GLOBAL .brand / .brand__mark / .btn / .app-main are left untouched (still-dark
+   auth + other pages depend on them) and overridden only inside the shell. */
 .app-header {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(10, 13, 19, 0.72);
-  backdrop-filter: saturate(160%) blur(12px);
-  border-bottom: 1px solid var(--border);
+  background: var(--vl-paper);
+  border-bottom: 2px solid var(--vl-ink);
 }
 
 .app-header__inner {
@@ -882,6 +884,35 @@ a:hover {
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 18px rgba(59, 130, 246, 0.45);
 }
 
+/* Shell-scoped overrides for the shared brand mark + CTA (global rules above stay
+   for the dark auth pages until their own pass). Square ink mark; concrete CTA. */
+.app-header .brand {
+  color: var(--vl-ink);
+  font-family: var(--vl-fd);
+}
+.app-header .brand__mark,
+.sb-brand .brand__mark {
+  border-radius: 0;
+  background: var(--vl-ink);
+  box-shadow: none;
+}
+.app-header .btn {
+  background: var(--vl-paper);
+  color: var(--vl-ink);
+  border: 2px solid var(--vl-ink);
+  border-radius: 0;
+  font-family: var(--vl-fd);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  box-shadow: var(--vl-shadow-blue);
+}
+.app-header .btn:hover {
+  background: var(--vl-paper);
+  box-shadow: 2px 2px 0 var(--vl-blue);
+  transform: translate(2px, 2px);
+}
+
 .app-nav {
   display: flex;
   align-items: center;
@@ -890,57 +921,71 @@ a:hover {
 }
 
 .nav-link {
-  padding: 0.4rem 0.7rem;
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  font-weight: 500;
-  font-size: 0.92rem;
-  transition: color 0.15s ease, background-color 0.15s ease;
+  padding: 0.5rem 0.8rem;
+  border-radius: 0;
+  color: var(--vl-muted);
+  font-family: var(--vl-fd);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  transition: color 0.12s linear, background-color 0.12s linear;
 }
 
 .nav-link:hover {
-  color: var(--text);
-  background: var(--surface-2);
+  color: var(--vl-ink);
+  background: var(--vl-paper-2);
   text-decoration: none;
 }
 
-/* Active route */
+/* Active route — inverted (ink bg, paper text). */
 .nav-link--active {
-  color: var(--text);
-  background: var(--surface-2);
+  color: var(--vl-paper);
+  background: var(--vl-ink);
 }
 
 .nav-link--active:hover {
+  color: var(--vl-paper);
+  background: var(--vl-ink);
   text-decoration: none;
 }
 
 /* Utility links (Admin / VC) read as system tools, not marketing tabs. */
 .nav-divider {
-  width: 1px;
+  width: 2px;
   height: 18px;
   margin: 0 0.35rem;
-  background: var(--border-strong);
+  background: var(--vl-ink);
 }
 
 .nav-link--utility {
-  color: var(--text-subtle);
-  font-size: 0.82rem;
+  color: var(--vl-muted);
+  font-size: 0.78rem;
   letter-spacing: 0.02em;
 }
 
 .nav-link--utility:hover {
-  color: var(--text-muted);
+  color: var(--vl-ink);
 }
 
 .nav-link--utility.nav-link--active {
-  color: var(--accent-strong);
-  background: var(--accent-weak);
+  color: var(--vl-paper);
+  background: var(--vl-blue);
 }
 
 .app-main {
   max-width: var(--container);
   margin: 0 auto;
   padding: 1.85rem 1.5rem 4rem;
+}
+
+/* The Team route is fully Concrete (.lake-scope) — let its workspace go full-bleed
+   paper so the ledger meets the concrete sidebar with no dark gutter. Scoped via
+   :has() so every OTHER (still-dark) page keeps the dark padded frame untouched. */
+.app-main:has(.lake-scope) {
+  max-width: none;
+  padding: 0;
+  background: var(--vl-paper);
 }
 
 .page {
@@ -2707,8 +2752,8 @@ p.badge {
   flex-direction: column;
   gap: 0.4rem;
   padding: 1rem 0.85rem 1.1rem;
-  background: var(--bg-sunken);
-  border-right: 1px solid var(--border);
+  background: var(--vl-paper);
+  border-right: 2px solid var(--vl-ink);
 }
 
 .sb-brand {
@@ -2719,10 +2764,12 @@ p.badge {
 }
 
 .sb-brand__name {
-  font-weight: 700;
+  font-family: var(--vl-fd);
+  font-weight: 800;
   font-size: 1.05rem;
   letter-spacing: -0.02em;
-  color: var(--text);
+  text-transform: uppercase;
+  color: var(--vl-ink);
 }
 
 .sb-nav {
@@ -2732,12 +2779,13 @@ p.badge {
 }
 
 .sb-section-label {
-  padding: 0.4rem 0.6rem 0.35rem;
-  font-family: var(--mono);
-  font-size: 0.68rem;
+  padding: 0.6rem 0.6rem 0.35rem;
+  font-family: var(--vl-fm);
+  font-size: 0.66rem;
+  font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--text-subtle);
+  color: var(--vl-muted);
 }
 
 .sb-link {
@@ -2745,23 +2793,25 @@ p.badge {
   align-items: center;
   gap: 0.65rem;
   width: 100%;
-  padding: 0.5rem 0.6rem;
+  padding: 0.6rem 0.6rem;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   background: none;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 0.92rem;
-  font-weight: 500;
+  color: var(--vl-muted);
+  font-family: var(--vl-fd);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   text-align: left;
   text-decoration: none;
   cursor: pointer;
-  transition: color 0.15s ease, background-color 0.15s ease;
+  transition: color 0.12s linear, background-color 0.12s linear;
 }
 
 .sb-link:hover {
-  color: var(--text);
-  background: var(--surface-2);
+  color: var(--vl-ink);
+  background: var(--vl-paper-2);
   text-decoration: none;
 }
 
@@ -2769,17 +2819,17 @@ p.badge {
   width: 17px;
   height: 17px;
   flex: none;
-  opacity: 0.8;
+  opacity: 1;
 }
 
 .sb-link--active {
-  color: var(--text);
-  background: var(--surface-2);
+  color: var(--vl-paper);
+  background: var(--vl-ink);
 }
 
 .sb-link--active svg {
   opacity: 1;
-  color: var(--accent-strong);
+  color: var(--vl-paper);
 }
 
 .sb-foot {
@@ -2788,12 +2838,12 @@ p.badge {
   flex-direction: column;
   gap: 0.15rem;
   padding-top: 0.6rem;
-  border-top: 1px solid var(--border);
+  border-top: 2px solid var(--vl-ink);
 }
 
 .sb-logout:hover {
-  color: var(--danger);
-  background: var(--danger-weak);
+  color: var(--vl-danger);
+  background: var(--vl-paper-2);
 }
 
 .app-workspace {
@@ -2819,9 +2869,8 @@ p.badge {
     gap: 0.25rem;
     padding: 0.5rem 0.85rem;
     border-right: none;
-    border-bottom: 1px solid var(--border);
-    background: rgba(10, 13, 19, 0.82);
-    backdrop-filter: saturate(160%) blur(12px);
+    border-bottom: 2px solid var(--vl-ink);
+    background: var(--vl-paper);
   }
 
   .sb-brand {
