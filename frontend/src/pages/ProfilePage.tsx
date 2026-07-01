@@ -46,16 +46,18 @@ export default function ProfilePage() {
 
   if (!profile) {
     return (
-      <div className="page">
+      <div className="page profile-page lake-scope lake-center">
         <h1>Profile</h1>
-        <div className="queue-state">
+        <div className="vl-card">
           <p>You haven't created your Founder Signal yet.</p>
           <p className="placeholder">
             Your profile — skills, role, interests, availability — is what the matchmaking uses to
             build your team. It's required before you can join the queue.
           </p>
           <p>
-            <Link to="/create-profile">Create your profile</Link>
+            <Link className="vl-btn vl-btn--primary" to="/create-profile">
+              Create your profile
+            </Link>
           </p>
         </div>
       </div>
@@ -64,14 +66,14 @@ export default function ProfilePage() {
 
   if (editing) {
     return (
-      <div className="page">
+      <div className="page profile-page lake-scope">
         <h1>Edit your profile</h1>
         <p className="placeholder profile-intro">
           This is what powers how you're matched into a team. Keep it sharp.
         </p>
         <ProfileForm initial={profile} submitLabel="Save changes" onSubmit={handleSave} />
         <p>
-          <button type="button" onClick={() => setEditing(false)} className="link-button">
+          <button type="button" onClick={() => setEditing(false)} className="vl-btn vl-btn--ghost">
             Cancel
           </button>
         </p>
@@ -80,36 +82,44 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="page">
-      <div className="profile-head">
+    <div className="page profile-page lake-scope lake-center">
+      <header className="profile-head">
         <div>
           <h1>{profile.name}</h1>
-          <p className="placeholder">
+          <p className="profile-meta">
             {ROLE_LABELS[profile.primaryRole]} · {profile.city} · {profile.timezone}
           </p>
           {(isVc || isAdmin) && (
             <div className="profile-status">
-              {isVc && <span className="status status--success">Approved VC reviewer</span>}
-              {isAdmin && <span className="status status--info">Admin</span>}
+              {isVc && (
+                <span className="vl-pill" data-state="done">
+                  <span className="vl-pill__label">Approved VC</span>
+                </span>
+              )}
+              {isAdmin && (
+                <span className="vl-pill" data-state="active">
+                  <span className="vl-pill__label">Admin</span>
+                </span>
+              )}
             </div>
           )}
         </div>
-        <button type="button" onClick={() => setEditing(true)}>
+        <button type="button" className="vl-btn vl-btn--primary" onClick={() => setEditing(true)}>
           Edit profile
         </button>
-      </div>
+      </header>
 
-      <div className="profile-cards">
-        <section className="queue-state">
+      <div className="profile-grid">
+        <section className="profile-cell">
           <h2>Role &amp; skills</h2>
-          <p className="placeholder">Primary role</p>
+          <p className="profile-meta">Primary role</p>
           <p>
             <strong>{ROLE_LABELS[profile.primaryRole]}</strong>
           </p>
           {profile.skills.length > 0 && (
             <div className="tag-row">
               {profile.skills.map((s) => (
-                <span className="tag" key={s}>
+                <span className="vl-chip" key={s}>
                   {s}
                 </span>
               ))}
@@ -117,16 +127,16 @@ export default function ProfilePage() {
           )}
         </section>
 
-        <section className="queue-state">
+        <section className="profile-cell">
           <h2>Availability</h2>
           <p>
             <strong>{profile.availabilityHoursPerWeek} h</strong> / week
           </p>
-          <p className="placeholder">Timezone · {profile.timezone}</p>
+          <p className="profile-meta">Timezone · {profile.timezone}</p>
           {profile.languages.length > 0 && (
             <div className="tag-row">
               {profile.languages.map((l) => (
-                <span className="tag" key={l}>
+                <span className="vl-chip" key={l}>
                   {l}
                 </span>
               ))}
@@ -134,23 +144,23 @@ export default function ProfilePage() {
           )}
         </section>
 
-        <section className="queue-state">
+        <section className="profile-cell profile-cell--wide">
           <h2>Industry interests</h2>
           {profile.industryInterests.length > 0 ? (
             <div className="tag-row">
               {profile.industryInterests.map((i) => (
-                <span className="tag" key={i}>
+                <span className="vl-chip" key={i}>
                   {i}
                 </span>
               ))}
             </div>
           ) : (
-            <p className="placeholder">None listed.</p>
+            <p className="profile-meta">None listed.</p>
           )}
         </section>
 
         {profile.bio && (
-          <section className="queue-state">
+          <section className="profile-cell profile-cell--wide">
             <h2>Bio</h2>
             <p>{profile.bio}</p>
           </section>

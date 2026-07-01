@@ -357,6 +357,214 @@
 .lake-scope code {
   font-family: var(--vl-fm);
 }
+
+/* ==========================================================================
+   Profile — Concrete (scoped, Pass 6). VIEW = spec-sheet: a shared-border
+   structural grid (cells butt together, 2px ink) — NOT floating cards. The EDIT
+   form (shared ProfileForm) is styled ONLY here under .lake-scope, so it stays
+   dark on the still-legacy /create-profile until that page's own pass.
+   ========================================================================== */
+.profile-page {
+  padding: 28px 40px 48px;
+}
+.lake-scope .profile-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding-bottom: 20px;
+  border-bottom: 2px solid var(--vl-ink);
+}
+.lake-scope .profile-head h1 {
+  margin: 0;
+  font-size: clamp(34px, 5vw, 52px);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  font-weight: 900;
+}
+.lake-scope .profile-meta {
+  font-family: var(--vl-fm);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--vl-muted);
+  margin: 8px 0 0;
+}
+.lake-scope .profile-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+/* Spec-sheet grid — cells share 2px ink borders (top+left on the grid, right+bottom
+   on each cell) so they butt together instead of floating. Bio spans full width. */
+.lake-scope .profile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 2px solid var(--vl-ink);
+  border-left: 2px solid var(--vl-ink);
+  margin-top: 28px;
+}
+.lake-scope .profile-cell {
+  border-right: 2px solid var(--vl-ink);
+  border-bottom: 2px solid var(--vl-ink);
+  padding: 22px 24px;
+  min-width: 0;
+}
+.lake-scope .profile-cell--wide {
+  grid-column: 1 / -1;
+}
+.lake-scope .profile-cell h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+.lake-scope .profile-cell p {
+  font-size: 14.5px;
+  line-height: 1.5;
+  margin: 6px 0 0;
+}
+.lake-scope .profile-cell strong {
+  color: var(--vl-ink);
+  font-weight: 700;
+}
+.lake-scope .tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.lake-scope .tag-row .vl-chip {
+  margin-top: 0;
+}
+.lake-scope .profile-intro {
+  max-width: 560px;
+  margin: 8px 0 20px;
+}
+
+/* Edit form — scoped concrete; the globals stay for the dark /create-profile. */
+.lake-scope .profile-form {
+  background: var(--vl-paper);
+  border: 2px solid var(--vl-ink);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  gap: 0;
+  max-width: 640px;
+}
+.lake-scope .form-group {
+  padding: 20px 22px;
+}
+.lake-scope .form-group + .form-group {
+  border-top: 2px solid var(--vl-ink);
+}
+.lake-scope .form-group__title h3 {
+  font-family: var(--vl-fm);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vl-muted);
+}
+.lake-scope .profile-form label,
+.lake-scope .field__label {
+  font-family: var(--vl-fm);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vl-muted);
+}
+.lake-scope .profile-form input,
+.lake-scope .profile-form select,
+.lake-scope .profile-form textarea {
+  border: 2px solid var(--vl-ink);
+  border-radius: 0;
+  background: var(--vl-paper-2);
+  color: var(--vl-ink);
+  font-family: var(--vl-fd);
+  font-size: 15px;
+  padding: 10px 12px;
+}
+.lake-scope .profile-form select {
+  font-family: var(--vl-fm);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+}
+.lake-scope .profile-form :is(input, select, textarea):focus {
+  outline: 2px solid var(--vl-blue);
+  outline-offset: 2px;
+}
+.lake-scope ::placeholder {
+  color: var(--vl-faint);
+}
+/* Skill chips → square concrete; checked inverts to ink. Deeper selector than
+   `.lake-scope .profile-form label` so the label rule above doesn't leak in. */
+.lake-scope .checkbox-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.lake-scope .profile-form .checkbox-row {
+  border: 2px solid var(--vl-ink);
+  border-radius: 0;
+  background: var(--vl-paper);
+  color: var(--vl-ink);
+  font-family: var(--vl-fd);
+  font-weight: 600 !important;
+  font-size: 0.88rem;
+  letter-spacing: normal;
+  text-transform: none;
+  padding: 0.42rem 0.8rem;
+}
+.lake-scope .profile-form .checkbox-row:hover {
+  background: var(--vl-paper-2);
+  color: var(--vl-ink);
+  border-color: var(--vl-ink);
+}
+.lake-scope .profile-form .checkbox-row:has(input:checked) {
+  background: var(--vl-ink);
+  color: var(--vl-paper);
+  border-color: var(--vl-ink);
+}
+.lake-scope .profile-form .checkbox-row:has(input:focus-visible) {
+  outline: 2px solid var(--vl-blue);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+.lake-scope .profile-form .form-error {
+  padding: 0 22px;
+}
+.lake-scope .profile-form button[type='submit'] {
+  margin: 4px 22px 22px;
+  min-height: 44px;
+  padding: 12px 20px;
+  border: 2px solid var(--vl-ink);
+  border-radius: 0;
+  background: var(--vl-paper);
+  color: var(--vl-ink);
+  font-family: var(--vl-fd);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  box-shadow: var(--vl-shadow-blue);
+  transition: transform 120ms linear, box-shadow 120ms linear;
+}
+.lake-scope .profile-form button[type='submit']:hover:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--vl-blue);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lake-scope .profile-form button[type='submit']:hover {
+    transform: none;
+  }
+}
 /* Lobby party rows fill the card width (the card stacks align-items:flex-start). */
 .lake-scope .party-join,
 .lake-scope .party-invite {
