@@ -55,19 +55,30 @@ export function PartyPanel({
 
   if (!party) {
     return (
-      <div className="queue-state">
+      <div className="vl-card">
         <h2>Party</h2>
         <p className="placeholder">Queue with friends as a party of up to 5.</p>
-        <button type="button" onClick={handleCreate} disabled={busy}>
+        <button
+          type="button"
+          className="vl-btn vl-btn--primary"
+          onClick={handleCreate}
+          disabled={busy}
+        >
           {busy ? 'Working…' : 'Create party'}
         </button>
         <div className="party-join">
           <input
+            className="vl-input"
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value)}
             placeholder="Enter invite code"
           />
-          <button type="button" onClick={handleJoin} disabled={busy || !joinCode.trim()}>
+          <button
+            type="button"
+            className="vl-btn vl-btn--primary"
+            onClick={handleJoin}
+            disabled={busy || !joinCode.trim()}
+          >
             Join party
           </button>
         </div>
@@ -79,14 +90,14 @@ export function PartyPanel({
   const isQueued = party.status === 'QUEUED';
 
   return (
-    <div className="queue-state">
+    <div className="vl-card">
       <h2>Your party ({party.members.length}/5)</h2>
 
-      <ul className="party-members">
+      <ul className="vl-list">
         {party.members.map((m) => (
           <li key={m.userId}>
             {m.displayName}
-            {m.isLeader && <span className="badge"> · leader</span>}
+            {m.isLeader && ' · leader'}
           </li>
         ))}
       </ul>
@@ -139,13 +150,23 @@ export function PartyPanel({
         </p>
       ) : (
         party.isLeader && (
-          <button type="button" onClick={handleQueue} disabled={busy}>
+          <button
+            type="button"
+            className="vl-btn vl-btn--primary"
+            onClick={handleQueue}
+            disabled={busy}
+          >
             {busy ? 'Working…' : 'Queue as party'}
           </button>
         )
       )}
 
-      <button type="button" onClick={handleLeave} disabled={busy} className="link-button">
+      <button
+        type="button"
+        onClick={handleLeave}
+        disabled={busy}
+        className="vl-btn vl-btn--ghost"
+      >
         Leave party
       </button>
 

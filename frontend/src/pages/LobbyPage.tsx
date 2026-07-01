@@ -107,7 +107,7 @@ export default function LobbyPage() {
   const queuedCount = stats?.queuedCount ?? 0;
 
   return (
-    <div className="page queue-terminal">
+    <div className="page queue-terminal lake-scope">
       <header className="qt-header">
         <h1>Queue Terminal</h1>
         <p className="placeholder">
@@ -153,7 +153,12 @@ export default function LobbyPage() {
               Hang tight — we're matching you on skill coverage, language, availability, and
               interests.
             </p>
-            <button type="button" onClick={handleLeave} disabled={busy}>
+            <button
+              type="button"
+              className="vl-btn vl-btn--ghost"
+              onClick={handleLeave}
+              disabled={busy}
+            >
               {busy ? 'Leaving…' : 'Leave Queue'}
             </button>
           </section>
@@ -168,7 +173,12 @@ export default function LobbyPage() {
               Join the global queue and we'll place you into a balanced founder team based on your
               skills and interests.
             </p>
-            <button type="button" className="btn btn--lg" onClick={handleJoin} disabled={busy}>
+            <button
+              type="button"
+              className="vl-btn vl-btn--primary"
+              onClick={handleJoin}
+              disabled={busy}
+            >
               {busy ? 'Joining…' : 'Join Queue'}
             </button>
           </section>
@@ -191,17 +201,17 @@ export default function LobbyPage() {
             )}
           </div>
 
-          <section className="queue-state">
+          <section className="vl-card">
             <h2>How matching works</h2>
             <p className="placeholder">
               Teams are formed around skill coverage, language compatibility, availability, and
               interests.
             </p>
             <div className="tag-row">
-              <span className="tag">Skill coverage</span>
-              <span className="tag">Language</span>
-              <span className="tag">Availability</span>
-              <span className="tag">Interests</span>
+              <span className="vl-chip">Skill coverage</span>
+              <span className="vl-chip">Language</span>
+              <span className="vl-chip">Availability</span>
+              <span className="vl-chip">Interests</span>
             </div>
           </section>
         </aside>
