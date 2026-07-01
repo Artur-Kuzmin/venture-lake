@@ -1018,15 +1018,28 @@ a:hover {
   padding: 1.85rem 1.5rem 4rem;
 }
 
-/* The Team route is fully Concrete (.lake-scope) — let its workspace go full-bleed
-   paper so the ledger meets the concrete sidebar with no dark gutter. Scoped via
-   :has() so every OTHER (still-dark) page keeps the dark padded frame untouched. */
+/* Concrete pages (.lake-scope) fill the workspace as a full-HEIGHT column, flush to
+   the sidebar (keeps the left seam), width-capped, and closed on the right with a
+   2px ink rule that runs the full height. So the paper below short content reads as
+   a framed structural field, not an unfinished trailing edge (density fix). Scoped
+   via :has() so every OTHER (still-dark) page keeps its dark padded frame untouched. */
 .app-workspace:has(.lake-scope) {
   background: var(--vl-paper);
+  display: flex;
 }
 .app-main:has(.lake-scope) {
   max-width: none;
   padding: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.app-main:has(.lake-scope) > .lake-scope {
+  width: 100%;
+  max-width: 1120px;
+  flex: 1;
+  border-right: 2px solid var(--vl-ink);
 }
 
 .page {
