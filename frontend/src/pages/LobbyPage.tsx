@@ -107,7 +107,7 @@ export default function LobbyPage() {
   const queuedCount = stats?.queuedCount ?? 0;
 
   return (
-    <div className="page queue-terminal lake-scope">
+    <div className="page queue-terminal lake-scope lake-center">
       <header className="qt-header">
         <h1>Queue Terminal</h1>
         <p className="placeholder">

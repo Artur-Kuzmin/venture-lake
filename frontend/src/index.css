@@ -1041,6 +1041,15 @@ a:hover {
   flex: 1;
   border-right: 2px solid var(--vl-ink);
 }
+/* Content-light pages opt in (add `lake-center`): short content sits in the optical
+   middle of the bounded field instead of jammed at the top. `safe center` falls back
+   to top-align once content overflows (real queue/party state, laptop heights), so
+   nothing is clipped. Team does NOT opt in — it's a top-down numbered sequence. */
+.app-main:has(.lake-scope) > .lake-scope.lake-center {
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center;
+}
 
 .page {
   padding: 0;
